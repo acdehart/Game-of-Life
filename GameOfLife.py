@@ -83,11 +83,11 @@ gameState = numpy.zeros((cellsX, cellsY), bool)
 # Values to serialize:
 stepByStep = False
 wraparound = True
-delayInt = 10 # Speed
+delayInt = 1 # Speed
 
 # Other values:
-delay = 0.1
-gamePaused = True
+delay = 0.001
+gamePaused = False
 mouseClicked = False
 fullscreen = False
 cellValue = 0
@@ -206,12 +206,12 @@ def waitForTheUser():
             elif event.type == pygame.KEYDOWN:
                 return
 
-# Fonts:
+# # Fonts:
 textFont = pygame.font.SysFont('arial', 17)
 continueFont = pygame.font.SysFont('arial', 14)
-# titleFont = pygame.font.Font(pygame.font.get_default_font(), 25)
-# I was forced to replace the line above for the line below
-# because Pyinstaller would find an error otherwise
+# # titleFont = pygame.font.Font(pygame.font.get_default_font(), 25)
+# # I was forced to replace the line above for the line below
+# # because Pyinstaller would find an error otherwise
 titleFont = pygame.font.SysFont('arial', 25)
 
 continueText = '[Press any key to continue]'
@@ -221,46 +221,46 @@ def displayContinueMessage():
     continueDy = height-21
     displayMessage(continueText, continueFont, continueDx, continueDy)
 
-intro = ['The Game of Life is a cellular automaton devised by the mathematician John Conway.',
-         'It consists of a grid of square cells, each of which is in one of two possible states, live',
-         'or dead, represented by black and white cells in this game respectively. Every cell',
-         'interacts with its eight neighbors, which are the cells that are horizontally, vertically,',
-         'or diagonally adjacent.', '',
-         'At each step of the game, the following transitions occur simultaneously:',
-         '   1. Any live cell with two or three live neighbors survives.',
-         '   2. Any dead cell with three live neighbors becomes a live cell.',
-         '   3. All other live cells die in the next generation.', '',
-         'By default, the grid behaves with periodic boundary conditions, namely, if something goes',
-         'beyond one border of the grid it appears from the opposite border. This is known as the',
-         'wrapping version of the game. You can change that later to treat the edges of the grid as',
-         'the end of the game world. Note that, in the non-wrapping version, some cells won\'t have',
-         'eight neighbors.', '',
-         'Music playback is of course a fundamental part of this game, therefore, you can drop your',
-         'playlist on the music folder before starting the game and it will be played on repeat.', '',
-         'At all times, the last 1000 game states are saved, so that you can go back to previous states.',
-         'I highly doubt anyone would be willing to hit a key more than that. But beware, because if you',
-         'speed up the game too much, you\'ll be changing states way much faster than you think and',
-         'you won\'t be able to undo your actions. Without further ado, have fun!']
-
-lineHeight = 20
-titleHeight = 50
-dy = (height - titleHeight - lineHeight * len(intro) - 5) // 2
-displayMessage('Welcome to the Game of Life!', titleFont, -1, dy)
-
-longest = 0
-for line in intro:
-    longest = max(longest, textWidth(line, textFont))
-leftMargin = ((width - longest) // 2) + 17
-
-dy += titleHeight
-for line in intro:
-    displayMessage(line, textFont, leftMargin, dy)
-    dy += lineHeight
-
-displayContinueMessage()
-
-pygame.display.update() # Update screen
-waitForTheUser()
+# intro = ['The Game of Life is a cellular automaton devised by the mathematician John Conway.',
+#          'It consists of a grid of square cells, each of which is in one of two possible states, live',
+#          'or dead, represented by black and white cells in this game respectively. Every cell',
+#          'interacts with its eight neighbors, which are the cells that are horizontally, vertically,',
+#          'or diagonally adjacent.', '',
+#          'At each step of the game, the following transitions occur simultaneously:',
+#          '   1. Any live cell with two or three live neighbors survives.',
+#          '   2. Any dead cell with three live neighbors becomes a live cell.',
+#          '   3. All other live cells die in the next generation.', '',
+#          'By default, the grid behaves with periodic boundary conditions, namely, if something goes',
+#          'beyond one border of the grid it appears from the opposite border. This is known as the',
+#          'wrapping version of the game. You can change that later to treat the edges of the grid as',
+#          'the end of the game world. Note that, in the non-wrapping version, some cells won\'t have',
+#          'eight neighbors.', '',
+#          'Music playback is of course a fundamental part of this game, therefore, you can drop your',
+#          'playlist on the music folder before starting the game and it will be played on repeat.', '',
+#          'At all times, the last 1000 game states are saved, so that you can go back to previous states.',
+#          'I highly doubt anyone would be willing to hit a key more than that. But beware, because if you',
+#          'speed up the game too much, you\'ll be changing states way much faster than you think and',
+#          'you won\'t be able to undo your actions. Without further ado, have fun!']
+#
+# lineHeight = 20
+# titleHeight = 50
+# dy = (height - titleHeight - lineHeight * len(intro) - 5) // 2
+# displayMessage('Welcome to the Game of Life!', titleFont, -1, dy)
+#
+# longest = 0
+# for line in intro:
+#     longest = max(longest, textWidth(line, textFont))
+# leftMargin = ((width - longest) // 2) + 17
+#
+# dy += titleHeight
+# for line in intro:
+#     displayMessage(line, textFont, leftMargin, dy)
+#     dy += lineHeight
+#
+# displayContinueMessage()
+#
+# pygame.display.update() # Update screen
+# waitForTheUser()
 
 def showControls():
     ''' Show game controls screen '''
@@ -307,24 +307,24 @@ def showControls():
     pygame.display.update()
     waitForTheUser()
 
-showControls()
+# showControls()
 
 ### Music playback ###
-musicDir = path + 'music' + os.sep
-playlist = list()
-if not os.path.exists(musicDir):
-    os.makedirs(musicDir)
-for file in sorted(os.listdir(musicDir)):
-    song = musicDir + file
-    playlist.append(song)
-playlistSize = len(playlist)
-pygame.mixer.init()
-pygame.mixer.music.set_endevent(pygame.USEREVENT)
-track = 0 # Current track
-playbackPaused = False
-if playlistSize > 0:
-    pygame.mixer.music.load(playlist[track])
-    pygame.mixer.music.play()
+# musicDir = path + 'music' + os.sep
+# playlist = list()
+# if not os.path.exists(musicDir):
+#     os.makedirs(musicDir)
+# for file in sorted(os.listdir(musicDir)):
+#     song = musicDir + file
+#     playlist.append(song)
+# playlistSize = len(playlist)
+# pygame.mixer.init()
+# pygame.mixer.music.set_endevent(pygame.USEREVENT)
+# track = 0 # Current track
+# playbackPaused = False
+# if playlistSize > 0:
+#     pygame.mixer.music.load(playlist[track])
+#     pygame.mixer.music.play()
 
 
 ### Game execution ###
@@ -424,6 +424,7 @@ updateScreen()
 
 while True:
     # Event handling:
+    print(delayInt)
     if isTryingToQuit():
         sys.exit()
     for event in pygame.event.get():
@@ -445,10 +446,10 @@ while True:
             mouseClicked = False
 
         # Handle track end event by playing the next song in the playlist
-        elif event.type == pygame.USEREVENT:
-            track = (track + 1) % playlistSize
-            pygame.mixer.music.load(playlist[track])
-            pygame.mixer.music.play()
+        # elif event.type == pygame.USEREVENT:
+        #     track = (track + 1) % playlistSize
+        #     pygame.mixer.music.load(playlist[track])
+        #     pygame.mixer.music.play()
 
         # Keyboard input:
         elif event.type == pygame.KEYDOWN:
@@ -561,26 +562,26 @@ while True:
                 showControls()
                 updateScreen()
 
-            elif playlistSize > 0:
-                # Pause/resume music playback when m is pressed
-                if event.key == pygame.K_m:
-                    if playbackPaused:
-                        pygame.mixer.music.unpause()
-                    else:
-                        pygame.mixer.music.pause()
-                    playbackPaused = not playbackPaused
+            # elif playlistSize > 0:
+            #     # Pause/resume music playback when m is pressed
+            #     if event.key == pygame.K_m:
+            #         if playbackPaused:
+            #             pygame.mixer.music.unpause()
+            #         else:
+            #             pygame.mixer.music.pause()
+            #         playbackPaused = not playbackPaused
 
                 # Play next song in the playlist when right arrow key is pressed
-                elif event.key == pygame.K_RIGHT:
-                    track = (track + 1) % playlistSize
-                    pygame.mixer.music.load(playlist[track])
-                    pygame.mixer.music.play()
+                # elif event.key == pygame.K_RIGHT:
+                #     track = (track + 1) % playlistSize
+                #     pygame.mixer.music.load(playlist[track])
+                #     pygame.mixer.music.play()
 
                 # Play previous song in the playlist when left arrow key is pressed
-                elif event.key == pygame.K_LEFT:
-                    track = (track - 1) % playlistSize
-                    pygame.mixer.music.load(playlist[track])
-                    pygame.mixer.music.play()
+                # elif event.key == pygame.K_LEFT:
+                #     track = (track - 1) % playlistSize
+                #     pygame.mixer.music.load(playlist[track])
+                #     pygame.mixer.music.play()
 
     # Handle mouse dragging
     if mouseClicked:
