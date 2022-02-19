@@ -28,17 +28,21 @@ path += os.sep
 # Colors:
 white = 240, 240, 240
 grey = 128, 128, 128
+darkgrey = 200, 200, 200
 black = 0, 0, 0
+blue = 0, 0, 128
+red = 128, 0, 0
 
 # Window creation:
-pygame.init() # Init all imported pygame modules
+pygame.init()  # Init all imported pygame modules
 iconPath = path + 'icon.png'
 windowTitle = 'Game of Life'
 pygame.display.set_caption(windowTitle)
 if os.path.exists(iconPath):
     icon = pygame.image.load(iconPath)
     pygame.display.set_icon(icon)
-windowSize = 800, 600
+windowSize = 600, 600
+res = 20
 width, height = windowSize
 screen = pygame.display.set_mode(windowSize)
 screenColor = white
@@ -46,29 +50,36 @@ screen.fill(screenColor)
 
 # Get focus back to main window after dialogs on Windows:
 windowHandle = None
+
+
 def updateWindowHandle():
     global windowHandle
     if onWindows:
         windowHandle = win32gui.FindWindow(None, windowTitle)
+
+
 updateWindowHandle()
+
+
 def focusWindow():
     if onWindows:
         win32gui.SetForegroundWindow(windowHandle)
 
+
 # Init dialogs:
-tkRoot = tkinter.Tk() # Create Tk main window
+tkRoot = tkinter.Tk()  # Create Tk main window
 if os.path.exists(iconPath):
-    tkRoot.iconphoto(True, tkinter.PhotoImage(file=iconPath)) # Set icon
+    tkRoot.iconphoto(True, tkinter.PhotoImage(file=iconPath))  # Set icon
 dx = (tkRoot.winfo_screenwidth() - width) // 2
 dy = (tkRoot.winfo_screenheight() - height) // 2
-tkRoot.geometry('{}x{}+{}+{}'.format(width, height, dx, dy)) # Center Tk window
-tkRoot.withdraw() # Hide Tk main window
+tkRoot.geometry('{}x{}+{}+{}'.format(width, height, dx, dy))  # Center Tk window
+tkRoot.withdraw()  # Hide Tk main window
 savesDir = path + 'saves'
 if not os.path.exists(savesDir):
     os.makedirs(savesDir)
 
 # Cells per axis
-cellsX, cellsY = 40, 30
+cellsX, cellsY = width // res, height // res
 
 # Dimensions of cells:
 cellWidth = width / cellsX
@@ -83,7 +94,7 @@ gameState = numpy.zeros((cellsX, cellsY), bool)
 # Values to serialize:
 stepByStep = False
 wraparound = True
-delayInt = 1 # Speed
+delayInt = 1  # Speed
 
 # Other values:
 delay = 0.001
@@ -96,15 +107,17 @@ lastTime = 0.0
 # Matrix that holds the cells borders
 poly = numpy.full((cellsX, cellsY), None)
 
+
 def updateCellsBorders():
     ''' Update cells borders with the current width and height for each cell '''
     for y in range(0, cellsY):
         for x in range(0, cellsX):
             # Rectangle to be drawn with upper left corner (x, y)
             poly[x, y] = [(x * cellWidth, y * cellHeight), \
-                        ((x+1) * cellWidth, y * cellHeight), \
-                        ((x+1) * cellWidth, (y+1) * cellHeight), \
-                        (x * cellWidth, (y+1) * cellHeight)]
+                          ((x + 1) * cellWidth, y * cellHeight), \
+                          ((x + 1) * cellWidth, (y + 1) * cellHeight), \
+                          (x * cellWidth, (y + 1) * cellHeight)]
+
 
 updateCellsBorders()
 
@@ -123,11 +136,11 @@ gameState[20, 8] = 1
 gameState[21, 7] = 1
 gameState[21, 8] = 1
 # Glider:
-gameState[31, 8] = 1
-gameState[32, 6] = 1
-gameState[32, 8] = 1
-gameState[33, 7] = 1
-gameState[33, 8] = 1
+gameState[cellsX - 10 + 1, 8] = 1
+gameState[cellsX - 10 + 2, 6] = 1
+gameState[cellsX - 10 + 2, 8] = 1
+gameState[cellsX - 10 + 3, 7] = 1
+gameState[cellsX - 10 + 3, 8] = 1
 # Lotus flower
 gameState[6, 20] = 1
 gameState[6, 21] = 1
@@ -160,9 +173,26 @@ gameState[21, 22] = 1
 gameState[21, 23] = 1
 gameState[21, 24] = 1
 # Blinker:
-gameState[32, 19] = 1
-gameState[32, 20] = 1
-gameState[32, 21] = 1
+gameState[cellsX - 10 + 2, 19] = 1
+gameState[cellsX - 10 + 2, 20] = 1
+gameState[cellsX - 10 + 2, 21] = 1
+
+r = 10
+
+
+class player:
+    def __init__(self):
+        self.living = True
+        self.x = cellsX // 2
+        self.y = cellsY // 2
+
+    def drawPlayer(self):
+        ''' Draw player's cell with coordinates (x, y) '''
+        pygame.draw.circle(screen, blue, [res * self.x + r, res * self.y + r], r)
+        # pygame.draw.circle(screen, blue, [0, 0], 10)
+
+
+p1 = player()
 
 
 ### Welcome screen and game controls ###
@@ -171,6 +201,7 @@ def textWidth(text, font):
     ''' Size in pixels of the given text '''
     textSurf = font.render(text, True, black)
     return textSurf.get_rect().width
+
 
 def displayMessage(text, font, dx, dy):
     ''' Show a message starting at (dx, dy). If dx=-1 then the message
@@ -185,13 +216,15 @@ def displayMessage(text, font, dx, dy):
         textRect.top = dy
     screen.blit(textSurf, textRect)
 
+
 def isTryingToQuit():
     ''' Determine whether the user is trying to quit the game with Alt + F4 '''
     pressed_keys = pygame.key.get_pressed()
     alt = pressed_keys[pygame.K_LALT] or \
-                pressed_keys[pygame.K_RALT]
+          pressed_keys[pygame.K_RALT]
     f4 = pressed_keys[pygame.K_F4]
     return alt and f4
+
 
 def waitForTheUser():
     ''' Wait for the user to press any key to continue '''
@@ -206,6 +239,7 @@ def waitForTheUser():
             elif event.type == pygame.KEYDOWN:
                 return
 
+
 # # Fonts:
 textFont = pygame.font.SysFont('arial', 17)
 continueFont = pygame.font.SysFont('arial', 14)
@@ -216,51 +250,13 @@ titleFont = pygame.font.SysFont('arial', 25)
 
 continueText = '[Press any key to continue]'
 continueTextWidth = textWidth(continueText, continueFont)
+
+
 def displayContinueMessage():
-    continueDx = width-continueTextWidth-3
-    continueDy = height-21
+    continueDx = width - continueTextWidth - 3
+    continueDy = height - 21
     displayMessage(continueText, continueFont, continueDx, continueDy)
 
-# intro = ['The Game of Life is a cellular automaton devised by the mathematician John Conway.',
-#          'It consists of a grid of square cells, each of which is in one of two possible states, live',
-#          'or dead, represented by black and white cells in this game respectively. Every cell',
-#          'interacts with its eight neighbors, which are the cells that are horizontally, vertically,',
-#          'or diagonally adjacent.', '',
-#          'At each step of the game, the following transitions occur simultaneously:',
-#          '   1. Any live cell with two or three live neighbors survives.',
-#          '   2. Any dead cell with three live neighbors becomes a live cell.',
-#          '   3. All other live cells die in the next generation.', '',
-#          'By default, the grid behaves with periodic boundary conditions, namely, if something goes',
-#          'beyond one border of the grid it appears from the opposite border. This is known as the',
-#          'wrapping version of the game. You can change that later to treat the edges of the grid as',
-#          'the end of the game world. Note that, in the non-wrapping version, some cells won\'t have',
-#          'eight neighbors.', '',
-#          'Music playback is of course a fundamental part of this game, therefore, you can drop your',
-#          'playlist on the music folder before starting the game and it will be played on repeat.', '',
-#          'At all times, the last 1000 game states are saved, so that you can go back to previous states.',
-#          'I highly doubt anyone would be willing to hit a key more than that. But beware, because if you',
-#          'speed up the game too much, you\'ll be changing states way much faster than you think and',
-#          'you won\'t be able to undo your actions. Without further ado, have fun!']
-#
-# lineHeight = 20
-# titleHeight = 50
-# dy = (height - titleHeight - lineHeight * len(intro) - 5) // 2
-# displayMessage('Welcome to the Game of Life!', titleFont, -1, dy)
-#
-# longest = 0
-# for line in intro:
-#     longest = max(longest, textWidth(line, textFont))
-# leftMargin = ((width - longest) // 2) + 17
-#
-# dy += titleHeight
-# for line in intro:
-#     displayMessage(line, textFont, leftMargin, dy)
-#     dy += lineHeight
-#
-# displayContinueMessage()
-#
-# pygame.display.update() # Update screen
-# waitForTheUser()
 
 def showControls():
     ''' Show game controls screen '''
@@ -307,24 +303,11 @@ def showControls():
     pygame.display.update()
     waitForTheUser()
 
-# showControls()
 
-### Music playback ###
-# musicDir = path + 'music' + os.sep
-# playlist = list()
-# if not os.path.exists(musicDir):
-#     os.makedirs(musicDir)
-# for file in sorted(os.listdir(musicDir)):
-#     song = musicDir + file
-#     playlist.append(song)
-# playlistSize = len(playlist)
-# pygame.mixer.init()
-# pygame.mixer.music.set_endevent(pygame.USEREVENT)
-# track = 0 # Current track
-# playbackPaused = False
-# if playlistSize > 0:
-#     pygame.mixer.music.load(playlist[track])
-#     pygame.mixer.music.play()
+# showControls()
+oof_sound = path + 'music' + os.sep + 'OOF.wav'
+pygame.mixer.init()
+pygame.mixer.music.load(oof_sound)
 
 
 ### Game execution ###
@@ -335,22 +318,36 @@ def currentCell():
     return (int(numpy.floor(posX / cellWidth)),
             int(numpy.floor(posY / cellHeight)))
 
+
 def drawCell(x, y):
     ''' Draw cell with coordinates (x, y) in the screen '''
     if gameState[x, y] == 0:
-        pygame.draw.polygon(screen, white, poly[x, y], 0)
+        pygame.draw.polygon(screen, grey, poly[x, y], 0)
         pygame.draw.polygon(screen, grey, poly[x, y], 1)
+        if len(states) > 0:
+            if states[-1][x, y] == 1:
+                pygame.draw.polygon(screen, red, poly[x, y], 0)
+                pygame.draw.polygon(screen, grey, poly[x, y], 1)
     else:
-        pygame.draw.polygon(screen, black, poly[x, y], 0)
+        pygame.draw.polygon(screen, darkgrey, poly[x, y], 0)
         pygame.draw.polygon(screen, grey, poly[x, y], 1)
+
 
 def updateScreen():
     ''' Update the screen with the current game state '''
+    global gamePaused
     screen.fill(screenColor)
     for y in range(0, cellsY):
         for x in range(0, cellsX):
             drawCell(x, y)
+    if p1.living:
+        p1.drawPlayer()
+
     pygame.display.update()
+
+    if not p1.living:
+        sleep(0.5)
+        restart_game()
 
 def liveNeighbors(x, y):
     ''' Count the number of live neighbors of cell (x, y) '''
@@ -373,11 +370,13 @@ def liveNeighbors(x, y):
                             count += 1
     return count - gameState[x, y]
 
+
 def updateGameState(newGameState):
     ''' Save and replace current game state '''
     global states, gameState
     states.append(gameState)
     gameState = newGameState
+
 
 def nextGeneration():
     ''' Set the game state to the new generation and update the screen '''
@@ -391,8 +390,13 @@ def nextGeneration():
             # Any live cell with less than 2 or more than 3 live neighbors dies.
             elif gameState[x, y] == 1 and (neighbors < 2 or neighbors > 3):
                 newGameState[x, y] = 0
+                if p1.x == x and p1.y == y and p1.living:
+                    p1.living = False
+                    pygame.mixer.music.play()
+
     updateGameState(newGameState)
     updateScreen()
+
 
 def toggleScreenMode():
     ''' Toggle between windowed and fullscreen mode '''
@@ -419,23 +423,22 @@ def toggleScreenMode():
     updateCellsBorders()
     updateScreen()
 
+
 # Show initial game state
 updateScreen()
 
-while True:
-    # Event handling:
-    print(delayInt)
-    if isTryingToQuit():
-        sys.exit()
+
+def handle_user_input():
+    global mouseClicked, cellValue, gamePaused, lastTime, gameState, wraparound, stepByStep, delay, states, delayInt
     for event in pygame.event.get():
-         # Close window when close button is pressed
+        # Close window when close button is pressed
         if event.type == pygame.QUIT:
             sys.exit()
 
         # Start changing cell states when the mouse buttons are pressed
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouseClicked = event.button == pygame.BUTTON_LEFT \
-                or event.button == pygame.BUTTON_RIGHT
+                           or event.button == pygame.BUTTON_RIGHT
             cellX, cellY = currentCell()
             cellValue = not gameState[cellX, cellY]
             # Save current game state before dragging
@@ -444,12 +447,6 @@ while True:
         # Stop changing cell states when the mouse buttons are released
         elif event.type == pygame.MOUSEBUTTONUP:
             mouseClicked = False
-
-        # Handle track end event by playing the next song in the playlist
-        # elif event.type == pygame.USEREVENT:
-        #     track = (track + 1) % playlistSize
-        #     pygame.mixer.music.load(playlist[track])
-        #     pygame.mixer.music.play()
 
         # Keyboard input:
         elif event.type == pygame.KEYDOWN:
@@ -480,11 +477,7 @@ while True:
 
             # Generate random game state when r is pressed
             elif event.key == pygame.K_r:
-                newGameState = numpy.random.choice\
-                (a=[0, 1], size=(cellsX, cellsY))
-                updateGameState(newGameState)
-                gamePaused = True
-                updateScreen()
+                restart_game()
 
             # Activate/deactivate wraparound mode when w is pressed
             elif event.key == pygame.K_w:
@@ -517,7 +510,7 @@ while True:
             # Save game when s is pressed
             elif event.key == pygame.K_s and not fullscreen:
                 filename = filedialog.asksaveasfilename(initialdir=savesDir, \
-                            defaultextension='.dat')
+                                                        defaultextension='.dat')
                 if filename:
                     data = (gameState, states, stepByStep, wraparound, delayInt)
                     try:
@@ -534,7 +527,7 @@ while True:
                 empty = len(os.listdir(savesDir)) == 0
                 firstFile = None if empty else sorted(os.listdir(savesDir))[0]
                 filename = filedialog.askopenfilename(initialdir=savesDir, \
-                            initialfile=firstFile)
+                                                      initialfile=firstFile)
                 if filename:
                     try:
                         data = ()
@@ -544,7 +537,7 @@ while True:
                         gamePaused = True
                         delay = delayInt / 100
                         updateScreen()
-                    except Exception: # Too much crap to catch, I took the easy way
+                    except Exception:  # Too much crap to catch, I took the easy way
                         messagebox.showerror("Read error", "Save data is corrupted")
                         tkRoot.update()
                 focusWindow()
@@ -561,28 +554,6 @@ while True:
             elif event.key == pygame.K_h:
                 showControls()
                 updateScreen()
-
-            # elif playlistSize > 0:
-            #     # Pause/resume music playback when m is pressed
-            #     if event.key == pygame.K_m:
-            #         if playbackPaused:
-            #             pygame.mixer.music.unpause()
-            #         else:
-            #             pygame.mixer.music.pause()
-            #         playbackPaused = not playbackPaused
-
-                # Play next song in the playlist when right arrow key is pressed
-                # elif event.key == pygame.K_RIGHT:
-                #     track = (track + 1) % playlistSize
-                #     pygame.mixer.music.load(playlist[track])
-                #     pygame.mixer.music.play()
-
-                # Play previous song in the playlist when left arrow key is pressed
-                # elif event.key == pygame.K_LEFT:
-                #     track = (track - 1) % playlistSize
-                #     pygame.mixer.music.load(playlist[track])
-                #     pygame.mixer.music.play()
-
     # Handle mouse dragging
     if mouseClicked:
         x, y = currentCell()
@@ -590,8 +561,25 @@ while True:
         drawCell(x, y)
         pygame.display.update()
 
+
+def restart_game():
+    global gamePaused
+    newGameState = numpy.random.choice \
+        (a=[0, 1], size=(cellsX, cellsY))
+    p1.living = True
+    updateGameState(newGameState)
+    gamePaused = False
+    updateScreen()
+
+
+while True:
+    # Event handling:
+    if isTryingToQuit():
+        sys.exit()
+    handle_user_input()
+
     if not stepByStep and not gamePaused:
-        if time()-lastTime > delay:
+        if time() - lastTime > delay:
             nextGeneration()
             lastTime = time()
 
