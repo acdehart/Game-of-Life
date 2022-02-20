@@ -1,3 +1,4 @@
+from random import randint
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 import numpy as np
@@ -746,7 +747,7 @@ class Model:
         # Main training loop
         for epoch in range(1, epochs+1):
             # Print epoch number
-            print(f'epoch: {epoch}')
+            # print(f'epoch: {epoch}')
             # Reset accumulated values in loss and accuracy objects
             self.loss.new_pass()
             self.accuracy.new_pass()
@@ -781,13 +782,13 @@ class Model:
                 self.optimizer.post_update_params()
 
                 # Print a summary
-                if not step % print_every or step == train_steps - 1:
-                    print(f'step: {step}, ' +
-                          f'acc: {accuracy:.3f}, ' +
-                          f'loss: {loss:.3f} (' +
-                          f'data_loss: {data_loss:.3f}, ' +
-                          f'reg_loss: {regularization_loss:.3f}), ' +
-                          f'lr: {self.optimizer.current_learning_rate}')
+                # if not step % print_every or step == train_steps - 1:
+                #     print(f'step: {step}, ' +
+                #           f'acc: {accuracy:.3f}, ' +
+                #           f'loss: {loss:.3f} (' +
+                #           f'data_loss: {data_loss:.3f}, ' +
+                #           f'reg_loss: {regularization_loss:.3f}), ' +
+                #           f'lr: {self.optimizer.current_learning_rate}')
 
         # Get and print epoch loss and accuracy
         epoch_data_loss, epoch_regularization_loss = self.loss.calculate_accumulated(include_regularization=True)
@@ -952,7 +953,7 @@ class Model:
     def set_parameters(self, parameters):
         # Iterate over the parameters and layers
         # and update each layers with each set of the parameters
-        for parameter_set, layer in zip(parameters,self.trainable_layers):
+        for parameter_set, layer in zip(parameters, self.trainable_layers):
             layer.set_parameters(*parameter_set)
 
     # Saves the parameters to a file
@@ -1026,18 +1027,17 @@ def load_mnist_dataset(dataset, path):
 # MNIST dataset (train + test)
 def create_data_mnist(path):
     # Load both sets separately
+
+
     X, y = load_mnist_dataset('train', path)
-    X_test, y_test = load_mnist_dataset('test', path)
 
     # Preprocess Data
     X = (X.astype(np.float32) - 127.5) / 127.5
-    X_test = (X_test.astype(np.float32) - 127.5) / 127.5
 
     X = X.reshape(X.shape[0], -1)
-    X_test = X_test.reshape(X_test.shape[0], -1)
 
     # And return all the data
-    return X, y, X_test, y_test
+    return X, y
 
 
 def get_mnist_data():
@@ -1108,43 +1108,51 @@ def main():
 
 
 def create_and_save_ai():
-    X, y, X_test, y_test = create_data_mnist('fashion_mnist_images')
+    X, y = create_data_mnist('gol_images')
     keys = np.array(range(X.shape[0]))
     np.random.shuffle(keys)
     X = X[keys]
     y = y[keys]
     # Instantiate the model
     model = Model()
-    # Add layers
-    neurons = 128
-    model.add(Layer_Dense(X.shape[1], neurons))
-    model.add(Activation_ReLU())
-    model.add(Layer_Dense(neurons, neurons))
-    model.add(Activation_ReLU())
-    model.add(Layer_Dense(neurons, 10))
-    model.add(Activation_Softmax())
-    # Set loss, optimizer and accuracy objects
-    model.set(loss=Loss_CategoricalCrossentropy(),
-              optimizer=Optimizer_Adam(decay=1e-3),
-              accuracy=Accuracy_Categorical()
-              )
-    model.finalize()
-    # model = model.load('fashion_mnist.model')
-    model.train(X, y, validation_data=(X_test, y_test),
-                epochs=10, batch_size=128, print_every=100)
-    model.evaluate(X, y, desc='Training')
-    model.evaluate(X_test, y_test, desc='Testing')
-    model.save_parameters('fashion_mnist.parms')
-    model.save('fashion_mnist.model')
 
+    if os.path.isfile('gol.model'):
+        model = model.load('gol.model')
+        model.load_parameters('gol.parms')
+    else:
+        # Add layers
+        neurons = 128
+        model.add(Layer_Dense(X.shape[1], neurons))
+        model.add(Activation_ReLU())
+        model.add(Layer_Dense(neurons, neurons))
+        model.add(Activation_ReLU())
+        model.add(Layer_Dense(neurons, 5))
+        model.add(Activation_Softmax())
+        # Set loss, optimizer and accuracy objects
+        model.set(loss=Loss_CategoricalCrossentropy(),
+                  optimizer=Optimizer_Adam(decay=1e-3),
+                  accuracy=Accuracy_Categorical()
+                  )
+        model.finalize()
+
+    model.train(X, y, epochs=10, batch_size=128, print_every=1000)
+    model.evaluate(X, y, desc='Training')
+    model.save_parameters('gol.parms')
+    model.save('gol.model')
+    return model
+
+
+    pass
 
 if __name__ == '__main__':
 
     # get_mnist_data()
 
+    generate_training_images()
+
     # create_and_save_ai()
 
-    main()
+    # main()
 
     # Retrieve and print parameters
     # parameters = model.get_parameters()
