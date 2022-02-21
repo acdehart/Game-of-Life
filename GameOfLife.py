@@ -1,9 +1,22 @@
+from random import randint
 from tkinter import filedialog
 from tkinter import messagebox
 from collections import deque
 from time import time, sleep
+
+import cv2
+import numpy as np
 import pygame, numpy, tkinter
 import os, sys, pickle
+
+import tensorflow as tf
+from tensorflow.keras.models import model_from_json
+tf.get_logger().setLevel('INFO')
+from tensorflow.keras.layers import InputLayer
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Sequential
+
+# from nn import create_and_save_ai, Model
 
 onWindows = sys.platform.startswith('win')
 if onWindows:
@@ -30,8 +43,18 @@ white = 240, 240, 240
 grey = 128, 128, 128
 darkgrey = 200, 200, 200
 black = 0, 0, 0
-blue = 0, 0, 128
-red = 128, 0, 0
+
+colors = {}
+colors['blue'] = 0, 0, 128
+colors['red'] = 128, 0, 0
+colors['green'] = 255, 165, 0
+colors['orange'] = 255, 165, 0
+colors['yellow'] = 128, 128, 0
+colors['purple'] = 128, 0, 128
+colors['brown'] = 130, 90, 44
+colors['teal'] = 0, 128, 128
+colors['pink'] = 255, 128, 255
+colors['cyan'] = 0, 128, 255
 
 # Window creation:
 pygame.init()  # Init all imported pygame modules
@@ -89,7 +112,7 @@ cellHeight = height / cellsY
 states = deque(maxlen=1000)
 
 # Cell states: live = 1, dead = 0
-gameState = numpy.zeros((cellsX, cellsY), bool)
+gameState = numpy.zeros((cellsX, cellsY), int)
 
 # Values to serialize:
 stepByStep = False
@@ -177,19 +200,113 @@ gameState[cellsX - 10 + 2, 19] = 1
 gameState[cellsX - 10 + 2, 20] = 1
 gameState[cellsX - 10 + 2, 21] = 1
 
-r = 10
+circ_rad = 10
+
+
+def get_coords():
+    coords = [(7, 7),
+              (7, 15),
+              (7, 21),
+              (15, 7),
+              (15, 15),
+              (15, 21),
+              (21, 7),
+              (21, 15),
+              (21, 21)]
+
+    for i in range(20):
+        coords.append((randint(4, 26), randint(4, 26)))
+    return coords
+
+
+def check_if_future_safe(choice, future):
+    x_mid = round(len(future[0])/2)
+    y_mid = x_mid
+
+    if choice == 0:  # Stay put
+        if future[y_mid][x_mid]:
+            return True
+    if choice == 1:  # Move up
+        if future[y_mid-1][x_mid]:
+            return True
+    if choice == 2:  # Move down
+        if future[y_mid+1][x_mid]:
+            return True
+    if choice == 3:  # Move left
+        if future[y_mid][x_mid-1]:
+            return True
+    if choice == 4:  # Move down
+        if future[y_mid][x_mid+1]:
+            return True
+
+
+class classroom:
+    def __init__(self):
+        self.students = []
+        for color in colors:
+            self.students.append(player(color))
 
 
 class player:
-    def __init__(self):
+    def __init__(self, color='blue'):
+        self.color = color
+        self.r = 10
+        self.n = (self.r * 2 + 1) ** 2
+        self.score = 0
+        self.deaths = 0
+        self.stagnation = 0
+        self.action = None
         self.living = True
+        self.model = Sequential()
+        self.model.add(InputLayer(batch_input_shape=(1, self.n)))
+        self.model.add(Dense(self.n + 5, activation='relu'))
+        self.model.add(Dense(5, activation='linear'))
+
+        if os.path.isfile('gol.h5'):
+            json_file = open('gol.json', 'r')
+            load_model_json = json_file.read()
+            json_file.close()
+            self.model = model_from_json(load_model_json)
+            self.model.load_weights('gol.h5')
+            print('Loaded existing model')
+
+        self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+
         self.x = cellsX // 2
         self.y = cellsY // 2
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
-        pygame.draw.circle(screen, blue, [res * self.x + r, res * self.y + r], r)
-        # pygame.draw.circle(screen, blue, [0, 0], 10)
+        pygame.draw.circle(screen, colors['blue'], [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+
+    def get_observable(self, state):
+        arr = [0] * self.n
+        i = 0
+        for row in range(self.y - self.r, self.y + self.r + 1):
+            for col in range(self.x - self.r, self.x + self.r + 1):
+                try:
+                    arr[i] = state[row][col]
+                except IndexError:
+                    pass
+                i += 1
+        arr = np.array(arr, np.uint8)
+        return arr.reshape(1, self.n)
+
+    # def train_ai(self):
+    #     pickle.dump(states, open('states.p', 'wb'))
+    #     generate_training_images()
+    #     p1.model = create_and_save_ai()
+
+    def move_on_prediction(self, prediction):
+        wall = 1
+        if prediction == 1 and self.y > wall:
+            self.y -= 1
+        if prediction == 2 and self.y < cellsY - wall:
+            self.y += 1
+        if prediction == 3 and self.x > wall:
+            self.x -= 1
+        if prediction == 4 and self.x < cellsX - wall:
+            self.x += 1
 
 
 p1 = player()
@@ -306,8 +423,9 @@ def showControls():
 
 # showControls()
 oof_sound = path + 'music' + os.sep + 'OOF.wav'
+ding_sound = path + 'music' + os.sep + 'ding.wav'
 pygame.mixer.init()
-pygame.mixer.music.load(oof_sound)
+pygame.mixer.music.set_volume(0.4)
 
 
 ### Game execution ###
@@ -326,7 +444,7 @@ def drawCell(x, y):
         pygame.draw.polygon(screen, grey, poly[x, y], 1)
         if len(states) > 0:
             if states[-1][x, y] == 1:
-                pygame.draw.polygon(screen, red, poly[x, y], 0)
+                pygame.draw.polygon(screen, colors['red'], poly[x, y], 0)
                 pygame.draw.polygon(screen, grey, poly[x, y], 1)
     else:
         pygame.draw.polygon(screen, darkgrey, poly[x, y], 0)
@@ -345,9 +463,11 @@ def updateScreen():
 
     pygame.display.update()
 
-    if not p1.living:
-        sleep(0.5)
+    if not p1.living or p1.stagnation > 100:
+        p1.stagnation = 0
+        # sleep(0.3)
         restart_game()
+
 
 def liveNeighbors(x, y):
     ''' Count the number of live neighbors of cell (x, y) '''
@@ -381,21 +501,49 @@ def updateGameState(newGameState):
 def nextGeneration():
     ''' Set the game state to the new generation and update the screen '''
     newGameState = numpy.copy(gameState)
+    reward = 0
+    old_score = p1.score
+
+    ''' Player decides on movement'''
+    woof = p1.get_observable(gameState)
+
+    if p1.model:
+        confidences = p1.model.predict(woof)[0]
+        # predictions = p1.model.output_layer_activation.predictions(confidences)
+        max_index = np.argmax(confidences)
+        options = [0, 1, 2, 3, 4]
+        prediction = options[max_index]
+        p1.move_on_prediction(prediction)
+
+    ''' The field determines the quality of it's decission '''
     for y in range(0, cellsY):
         for x in range(0, cellsX):
             neighbors = liveNeighbors(x, y)
             # Any dead cell with 3 live neighbors becomes a live cell.
             if gameState[x, y] == 0 and neighbors == 3:
                 newGameState[x, y] = 1
+                if x == p1.x and y == p1.y and p1.living:
+                    reward = 1
+                    p1.stagnation = 0
+                    p1.score += 1
             # Any live cell with less than 2 or more than 3 live neighbors dies.
             elif gameState[x, y] == 1 and (neighbors < 2 or neighbors > 3):
                 newGameState[x, y] = 0
                 if p1.x == x and p1.y == y and p1.living:
                     p1.living = False
-                    pygame.mixer.music.play()
+                    p1.deaths += 1
+                    reward = -1
+                    p1.stagnation = 0
+                    # pygame.mixer.music.load(oof_sound)
+                    # pygame.mixer.music.play()
+
+    if old_score == p1.score:
+        p1.stagnation += 1
 
     updateGameState(newGameState)
     updateScreen()
+
+    return newGameState, reward
 
 
 def toggleScreenMode():
@@ -572,16 +720,56 @@ def restart_game():
     updateScreen()
 
 
+discount_factor = 0.95
+eps = 0.5
+eps_decay_factor = 0.999
+learning_rate = 0.8
+choices = [0, 1, 2, 3, 4]
+
 while True:
     # Event handling:
     if isTryingToQuit():
         sys.exit()
     handle_user_input()
 
+    if np.random.random() < eps or len(states) == 0:
+        p1.action = np.random.choice(choices)
+    else:
+        woof = p1.get_observable(states[-1])
+        p1.action = np.argmax(p1.model.predict(woof)[0])
+
     if not stepByStep and not gamePaused:
         if time() - lastTime > delay:
-            nextGeneration()
+            newGameState, reward = nextGeneration()
+            if len(states) > 0:
+                r = 2
+                woof = p1.get_observable(states[-1])
+                target = reward + discount_factor * np.max(p1.model.predict(woof)[0])
+                target_vector = p1.model.predict(woof)[0]
+                target_vector[p1.action] = target
+                tv = target_vector.reshape(-1, 5)
+                p1.model.fit(woof, tv, epochs=1, verbose=0)
+
             lastTime = time()
 
+            if len(states)%100 == 1:
+                print('.', end='')
+
+    if len(states) >= 499:
+        pygame.mixer.music.load(ding_sound)
+        pygame.mixer.music.play()
+        print(f"\nScore: {p1.score} | Deaths: {p1.deaths} | S/D: {round(p1.score/p1.deaths,2)}")
+        model_json = p1.model.to_json()
+        with open('gol.json', 'w') as json_file:
+            json_file.write(model_json)
+        p1.model.save_weights('gol.h5')
+
+        p1.score = 0
+        p1.living = False
+        # p1.train_ai()
+        states.clear()
+        eps *= eps_decay_factor
+
+
     # Sleep for a moment to avoid unnecessary computation
-    sleep(0.01)
+    # sleep(0.0001)
