@@ -1116,8 +1116,8 @@ def create_and_save_ai():
     # Instantiate the model
     model = Model()
 
-    if os.path.isfile('gol.model'):
-        model = model.load('gol.model')
+    if os.path.isfile('gol_model'):
+        model = model.load('gol_model')
         model.load_parameters('gol.parms')
     else:
         # Add layers
@@ -1138,7 +1138,7 @@ def create_and_save_ai():
     model.train(X, y, epochs=10, batch_size=128, print_every=1000)
     model.evaluate(X, y, desc='Training')
     model.save_parameters('gol.parms')
-    model.save('gol.model')
+    model.save('gol_model')
     return model
 
 
