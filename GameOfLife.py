@@ -1,3 +1,4 @@
+import math
 from random import randint
 from tkinter import filedialog
 from tkinter import messagebox
@@ -253,6 +254,7 @@ class player:
         self.r = 10
         self.n = (self.r * 2 + 1) ** 2
         self.score = 0
+        self.woosh = 1
         self.deaths = 0
         self.stagnation = 0
         self.action = None
@@ -260,6 +262,7 @@ class player:
         self.model = Sequential()
         self.model.add(InputLayer(batch_input_shape=(1, self.n)))
         self.model.add(Dense(self.n + 5, activation='relu'))
+        self.model.add(Dense(self.n//2 + 5, activation='relu'))
         self.model.add(Dense(5, activation='linear'))
 
         if os.path.isfile('gol.h5'):
@@ -280,16 +283,18 @@ class player:
         pygame.draw.circle(screen, colors['blue'], [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
 
     def get_observable(self, state):
-        arr = [0] * self.n
+        arr = [-1] * self.n
         i = 0
         for row in range(self.y - self.r, self.y + self.r + 1):
             for col in range(self.x - self.r, self.x + self.r + 1):
                 try:
-                    arr[i] = state[row][col]
+                    if state[row][col]:
+                        arr[i] = state[row][col]
                 except IndexError:
                     pass
+                arr[i] *= 1/(1+math.sqrt((row-self.y)**2 + (col-self.x)**2))
                 i += 1
-        arr = np.array(arr, np.uint8)
+        arr = np.array(arr, np.float)
         return arr.reshape(1, self.n)
 
     # def train_ai(self):
@@ -298,15 +303,27 @@ class player:
     #     p1.model = create_and_save_ai()
 
     def move_on_prediction(self, prediction):
-        wall = 1
-        if prediction == 1 and self.y > wall:
-            self.y -= 1
-        if prediction == 2 and self.y < cellsY - wall:
-            self.y += 1
-        if prediction == 3 and self.x > wall:
-            self.x -= 1
-        if prediction == 4 and self.x < cellsX - wall:
-            self.x += 1
+        wall = 0
+        if prediction == 1:
+            if self.y > wall:
+                self.y -= 1
+            else:
+                self.y += cellsY
+        if prediction == 2:
+            if self.y < cellsY - wall:
+                self.y += 1
+            else:
+                self.y -= cellsY
+        if prediction == 3:
+            if self.x > wall:
+                self.x -= 1
+            else:
+                self.x += cellsX
+        if prediction == 4:
+            if self.x < cellsX - wall:
+                self.x += 1
+            else:
+                self.x -= cellsX
 
 
 p1 = player()
@@ -501,7 +518,7 @@ def updateGameState(newGameState):
 def nextGeneration():
     ''' Set the game state to the new generation and update the screen '''
     newGameState = numpy.copy(gameState)
-    reward = 0
+    reward = -.1
     old_score = p1.score
 
     ''' Player decides on movement'''
@@ -523,7 +540,8 @@ def nextGeneration():
             if gameState[x, y] == 0 and neighbors == 3:
                 newGameState[x, y] = 1
                 if x == p1.x and y == p1.y and p1.living:
-                    reward = 1
+                    reward = 10 * p1.woosh
+                    p1.woosh += 1
                     p1.stagnation = 0
                     p1.score += 1
             # Any live cell with less than 2 or more than 3 live neighbors dies.
@@ -531,14 +549,21 @@ def nextGeneration():
                 newGameState[x, y] = 0
                 if p1.x == x and p1.y == y and p1.living:
                     p1.living = False
+                    p1.x = cellsX // 2
+                    p1.y = cellsY // 2
                     p1.deaths += 1
-                    reward = -1
+                    reward = -.5
                     p1.stagnation = 0
+                    p1.woosh = 1
                     # pygame.mixer.music.load(oof_sound)
                     # pygame.mixer.music.play()
 
     if old_score == p1.score:
+        # No points scored
+        p1.woosh = 1
         p1.stagnation += 1
+    else:
+        p1.woosh += 1
 
     updateGameState(newGameState)
     updateScreen()
@@ -714,6 +739,12 @@ def restart_game():
     global gamePaused
     newGameState = numpy.random.choice \
         (a=[0, 1], size=(cellsX, cellsY))
+    newGameState[cellsY//2][cellsX//2] = 0
+    newGameState[cellsY//2][cellsX//2+1] = 0
+    newGameState[cellsY//2][cellsX//2-1] = 0
+    newGameState[cellsY//2+1][cellsX//2] = 0
+    newGameState[cellsY//2-1][cellsX//2] = 0
+
     p1.living = True
     updateGameState(newGameState)
     gamePaused = False
@@ -742,7 +773,6 @@ while True:
         if time() - lastTime > delay:
             newGameState, reward = nextGeneration()
             if len(states) > 0:
-                r = 2
                 woof = p1.get_observable(states[-1])
                 target = reward + discount_factor * np.max(p1.model.predict(woof)[0])
                 target_vector = p1.model.predict(woof)[0]
@@ -765,6 +795,9 @@ while True:
         p1.model.save_weights('gol.h5')
 
         p1.score = 0
+        p1.x = cellsX // 2
+        p1.y = cellsY // 2
+        p1.deaths = 0
         p1.living = False
         # p1.train_ai()
         states.clear()
