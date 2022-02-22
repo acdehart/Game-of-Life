@@ -68,6 +68,7 @@ if os.path.exists(iconPath):
 windowSize = 600, 600
 res = 20
 width, height = windowSize
+
 screen = pygame.display.set_mode(windowSize)
 screenColor = white
 screen.fill(screenColor)
@@ -203,7 +204,6 @@ gameState[cellsX - 10 + 2, 21] = 1
 
 circ_rad = 10
 
-
 def get_coords():
     coords = [(7, 7),
               (7, 15),
@@ -251,19 +251,15 @@ class classroom:
 class player:
     def __init__(self, color='blue'):
         self.color = color
-        self.r = 10
+        self.r = 5
         self.n = (self.r * 2 + 1) ** 2
         self.score = 0
         self.woosh = 1
         self.deaths = 0
         self.stagnation = 0
-        self.action = None
+        self.action = 0
         self.living = True
-        self.model = Sequential()
-        self.model.add(InputLayer(batch_input_shape=(1, self.n)))
-        self.model.add(Dense(self.n + 5, activation='relu'))
-        self.model.add(Dense(self.n//2 + 5, activation='relu'))
-        self.model.add(Dense(5, activation='linear'))
+        self.observation = None
 
         if os.path.isfile('gol.h5'):
             json_file = open('gol.json', 'r')
@@ -272,6 +268,14 @@ class player:
             self.model = model_from_json(load_model_json)
             self.model.load_weights('gol.h5')
             print('Loaded existing model')
+        else:
+            self.model = Sequential()
+            self.model.add(InputLayer(batch_input_shape=(1, self.n)))
+            self.model.add(
+                Dense(self.n + 5, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(
+                Dense(self.n // 2 + 5, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(Dense(5, activation='linear'))
 
         self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
@@ -284,50 +288,52 @@ class player:
 
     def get_observable(self, state):
         arr = [-1] * self.n
+        map = []
         i = 0
         for row in range(self.y - self.r, self.y + self.r + 1):
+            temp = []
             for col in range(self.x - self.r, self.x + self.r + 1):
-                try:
-                    if state[row][col]:
-                        arr[i] = state[row][col]
-                except IndexError:
-                    pass
-                arr[i] *= 1/(1+math.sqrt((row-self.y)**2 + (col-self.x)**2))
+                # try:
+                if state[col % cellsX, row % cellsY]:
+                    arr[i] = state[col % cellsX, row % cellsY]
+                # except IndexError:
+                #     pass
+                inverse_radius = 1/(1+math.sqrt((row-self.y)**2 + (col-self.x)**2)/2)
+                if arr[i] == -1:
+                    arr[i] *= inverse_radius
+                temp.append(arr[i])
                 i += 1
+            map.append(temp)
+        map = np.array(map, np.float)
         arr = np.array(arr, np.float)
-        return arr.reshape(1, self.n)
 
-    # def train_ai(self):
-    #     pickle.dump(states, open('states.p', 'wb'))
-    #     generate_training_images()
-    #     p1.model = create_and_save_ai()
+        self.observation = arr.reshape(1, self.n)
 
     def move_on_prediction(self, prediction):
         wall = 0
-        if prediction == 1:
+        if prediction == 1:  # UP
             if self.y > wall:
                 self.y -= 1
             else:
-                self.y += cellsY
-        if prediction == 2:
+                self.y = cellsY - 1
+        if prediction == 2:  # DOWN
             if self.y < cellsY - wall:
                 self.y += 1
             else:
-                self.y -= cellsY
-        if prediction == 3:
+                self.y = 0
+        if prediction == 3:  # LEFT
             if self.x > wall:
                 self.x -= 1
             else:
-                self.x += cellsX
-        if prediction == 4:
+                self.x = cellsX - 1
+        if prediction == 4:  # RIGHT
             if self.x < cellsX - wall:
                 self.x += 1
             else:
-                self.x -= cellsX
+                self.x = 0
 
 
 p1 = player()
-
 
 ### Welcome screen and game controls ###
 
@@ -522,15 +528,14 @@ def nextGeneration():
     old_score = p1.score
 
     ''' Player decides on movement'''
-    woof = p1.get_observable(gameState)
+    p1.get_observable(gameState)
 
-    if p1.model:
-        confidences = p1.model.predict(woof)[0]
-        # predictions = p1.model.output_layer_activation.predictions(confidences)
-        max_index = np.argmax(confidences)
-        options = [0, 1, 2, 3, 4]
-        prediction = options[max_index]
-        p1.move_on_prediction(prediction)
+    if np.random.random() < eps or len(states) == 0:
+        p1.action = np.random.choice(choices)
+    else:
+        p1.action = np.argmax(p1.model.predict(p1.observation)[0])
+
+    p1.move_on_prediction(p1.action)
 
     ''' The field determines the quality of it's decission '''
     for y in range(0, cellsY):
@@ -627,7 +632,8 @@ def handle_user_input():
             if event.key == pygame.K_SPACE:
                 # Go to the next generation
                 if stepByStep:
-                    nextGeneration()
+                    pass
+                    # nextGeneration()
                 # Pause/resume the game
                 else:
                     gamePaused = not gamePaused
@@ -644,7 +650,7 @@ def handle_user_input():
             # Kill all cells when c is pressed
             elif event.key == pygame.K_c:
                 newGameState = numpy.zeros((cellsX, cellsY))
-                updateGameState(newGameState)
+                # updateGameState(newGameState)
                 gamePaused = True
                 updateScreen()
 
@@ -763,22 +769,15 @@ while True:
         sys.exit()
     handle_user_input()
 
-    if np.random.random() < eps or len(states) == 0:
-        p1.action = np.random.choice(choices)
-    else:
-        woof = p1.get_observable(states[-1])
-        p1.action = np.argmax(p1.model.predict(woof)[0])
-
     if not stepByStep and not gamePaused:
         if time() - lastTime > delay:
             newGameState, reward = nextGeneration()
-            if len(states) > 0:
-                woof = p1.get_observable(states[-1])
-                target = reward + discount_factor * np.max(p1.model.predict(woof)[0])
-                target_vector = p1.model.predict(woof)[0]
+            if len(states) > 1:
+                target = reward + discount_factor * np.max(p1.model.predict(p1.observation)[0])
+                target_vector = p1.model.predict(p1.observation)[0]
                 target_vector[p1.action] = target
                 tv = target_vector.reshape(-1, 5)
-                p1.model.fit(woof, tv, epochs=1, verbose=0)
+                p1.model.fit(p1.observation, tv, epochs=1, verbose=0)
 
             lastTime = time()
 
