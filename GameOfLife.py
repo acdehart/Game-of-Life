@@ -447,7 +447,8 @@ class player:
         if self.reward < 0:
             pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
         if self.reward > 0:
-            pygame.draw.circle(screen, white, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
+            pygame.draw.rect(screen, white, pygame.Rect(res * self.x + circ_rad-1, res * self.y, circ_rad*.25, circ_rad*2))
+            pygame.draw.rect(screen, white, pygame.Rect(res * self.x, res * self.y + circ_rad-1, circ_rad*2, circ_rad*0.25))
         if self.lives > 0:
             self.reward = 0
             self.living = True
