@@ -297,11 +297,24 @@ class classroom:
             if max_score > 29:
                 pygame.mixer.music.load(ding_sound)
                 pygame.mixer.music.play()
-            sleep(2)
+                sleep(5)
 
         return {'winner': winner, 'max_score': max_score}
 
+    def draw_scoreboard(self):
+        font = pygame.font.Font('freesansbold.ttf', 32)
+        texts = []
+        best = c1.report_best(verbose=False)
+        for i, student in enumerate(c1.students):
+            line = f"P{i + 1} {'I' * student.lives} {student.score}"
+            texts.append(line)
+        for i, text in enumerate(texts):
+            text = font.render(text, True, red, grey)
+            text.set_alpha(200)
+            textRect = text.get_rect()
+            textRect.y += i*32
 
+            screen.blit(text, textRect)
 
     def draw_living(self):
         for student in self.students[::-1]:
@@ -658,9 +671,8 @@ def updateScreen():
         for x in range(0, cellsX):
             drawCell(x, y)
     c1.draw_living()
-
+    c1.draw_scoreboard()
     pygame.display.update()
-
 
 
 def liveNeighbors(x, y):
