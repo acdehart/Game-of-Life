@@ -7,11 +7,13 @@ from time import time, sleep
 
 import cv2
 import numpy as np
+import pandas as pd
 import pygame, numpy, tkinter
 import os, sys, pickle
 
 import tensorflow as tf
 from tensorflow.keras.models import model_from_json
+
 tf.get_logger().setLevel('INFO')
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.layers import Dense
@@ -39,16 +41,15 @@ else:
     path = os.path.dirname(os.path.abspath(__file__))
 path += os.sep
 
-# Colors:
 white = 240, 240, 240
 grey = 128, 128, 128
 darkgrey = 200, 200, 200
 black = 0, 0, 0
+red = 128, 0, 0
 
 colors = {}
 colors['blue'] = 0, 0, 128
-colors['red'] = 128, 0, 0
-colors['green'] = 255, 165, 0
+colors['green'] = 0, 165, 0
 colors['orange'] = 255, 165, 0
 colors['yellow'] = 128, 128, 0
 colors['purple'] = 128, 0, 128
@@ -65,10 +66,10 @@ pygame.display.set_caption(windowTitle)
 if os.path.exists(iconPath):
     icon = pygame.image.load(iconPath)
     pygame.display.set_icon(icon)
-windowSize = 600, 600
+windowSize = 800, 600
 res = 20
 width, height = windowSize
-
+safety_radius = 0.7
 screen = pygame.display.set_mode(windowSize)
 screenColor = white
 screen.fill(screenColor)
@@ -204,6 +205,7 @@ gameState[cellsX - 10 + 2, 21] = 1
 
 circ_rad = 10
 
+
 def get_coords():
     coords = [(7, 7),
               (7, 15),
@@ -221,46 +223,37 @@ def get_coords():
 
 
 def check_if_future_safe(choice, future):
-    x_mid = round(len(future[0])/2)
+    x_mid = round(len(future[0]) / 2)
     y_mid = x_mid
 
     if choice == 0:  # Stay put
         if future[y_mid][x_mid]:
             return True
     if choice == 1:  # Move up
-        if future[y_mid-1][x_mid]:
+        if future[y_mid - 1][x_mid]:
             return True
     if choice == 2:  # Move down
-        if future[y_mid+1][x_mid]:
+        if future[y_mid + 1][x_mid]:
             return True
     if choice == 3:  # Move left
-        if future[y_mid][x_mid-1]:
+        if future[y_mid][x_mid - 1]:
             return True
     if choice == 4:  # Move down
-        if future[y_mid][x_mid+1]:
+        if future[y_mid][x_mid + 1]:
             return True
 
 
 class classroom:
     def __init__(self):
         self.students = []
-        for color in colors:
-            self.students.append(player(color))
+        self.player1 = True
+        if self.player1:
+            self.students.append(player('blue'))
+        for _ in range(15):
+            self.students.append(player())
 
-
-class player:
-    def __init__(self, color='blue'):
-        self.color = color
-        self.r = 5
+        self.r = 8
         self.n = (self.r * 2 + 1) ** 2
-        self.score = 0
-        self.woosh = 1
-        self.deaths = 0
-        self.stagnation = 0
-        self.action = 0
-        self.living = True
-        self.observation = None
-
         if os.path.isfile('gol.h5'):
             json_file = open('gol.json', 'r')
             load_model_json = json_file.read()
@@ -279,26 +272,200 @@ class player:
 
         self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
-        self.x = cellsX // 2
-        self.y = cellsY // 2
+    def report_best(self, verbose=True):
+        max_score = 0
+        max_living_score = 0
+        winner = None
+        living_winner = None
+        report = ""
+        for i, student in enumerate(self.students):
+            if student.score > max_score:
+                max_score = student.score
+                max_living_score = max_score
+                winner = i+1
+                living_winner = winner
+                if student.living:
+                    living_winner = i+1
+                    max_living_score = student.score
+        report = f"P{winner} in the lead with {max_score}!"
+
+        if living_winner:
+            report = f"P{living_winner} wins with {max_living_score}!"
+
+        if verbose:
+            print(report)
+            if max_score > 29:
+                pygame.mixer.music.load(ding_sound)
+                pygame.mixer.music.play()
+            sleep(2)
+
+        return {'winner': winner, 'max_score': max_score}
+
+
+
+    def draw_living(self):
+        for student in self.students[::-1]:
+            if student.living:
+                student.drawPlayer()
+
+    def count_living(self):
+        living_count = 0
+        for student in self.students:
+            if student.living:
+                living_count += 1
+        return living_count
+
+    def count_living_ratio(self):
+        return self.count_living() / len(self.students)
+
+    def resuscitate(self):
+        for student in self.students:
+            student.living = True
+            student.lives = 3
+
+    def observe(self, gameState):
+        for student in self.students:
+            if student.living:
+                student.stagnation += 1
+                student.get_observable(gameState)
+            else:
+                student.stagnation = 1000
+
+    def act(self):
+        for i, student in enumerate(self.students):
+            if not (self.player1 and i == 0):
+                student.get_action()
+            student.move_on_prediction(student.action)
+            student.action = None
+
+    def reward_living(self, x, y):
+        for student in self.students:
+            if x == student.x and y == student.y and student.living:
+                student.stagnation = 0
+                student.reward = 10
+                student.score += 1
+
+    def punish_living(self, x, y):
+        for student in self.students:
+            if student.x == x and student.y == y and student.living:
+                student.lives -= 1
+                student.reward = -.5
+                student.living = False
+
+                if student.lives <= 0:
+                    student.stagnation = 0
+                    student.x = cellsX // 2
+                    student.y = cellsY // 2
+
+    def update_model(self):
+        observations = []
+        tvs = []
+
+        for student in self.students:
+            if student.living and student.reward != 0:
+                target = student.reward + discount_factor * np.max(c1.model.predict(student.observation)[0])
+                target_vector = c1.model.predict(student.observation)[0]
+                target_vector[student.action] = target
+                tv = target_vector.reshape(-1, 5)
+                observations.append(student.observation)
+                tvs.append(tv)
+
+        if len(observations)>0:
+            observations = np.array(observations)[:, 0, :]
+            tvs = np.array(tvs)[:, 0, :]
+            c1.model.fit(observations, tvs, epochs=1, verbose=0)
+
+        # for student in c1.students:
+        #     student.reward = 0
+
+    def reset_students(self):
+        for student in self.students:
+            student.score = 0
+            student.stagnation = 0
+            student.deaths = 0
+            student.x = cellsX//2 + randint(-5, 5)
+            student.y = cellsY//2 + randint(-5, 5)
+        self.resuscitate()
+
+    def stagnation(self):
+        min_stagnation = self.get_min_stag()
+        best = self.report_best(verbose=False)
+
+        if self.count_living() <= 1:
+            print(f"Stagnation... P{best['winner']} Last Alive with {best['max_score']}")
+            return True
+
+        if min_stagnation > 30:
+            print("Stagnation... No points scored")
+            return True
+
+        for student in self.students:
+            if student.score > 29:
+                print(f"Stagnation... {student.score} points scored")
+                return True
+
+        return False
+
+    def get_min_stag(self):
+        min_stagnation = 1000
+        for student in self.students:
+            if student.stagnation < min_stagnation:
+                min_stagnation = student.stagnation
+        return min_stagnation
+
+    def report(self):
+        for i, s in enumerate(self.students):
+            if s.living:
+                print(f"P{i+1} {'I'*s.lives} {s.score} | ", end='')
+            else:
+                print(f"   {'I'*s.lives}    {s.score} | ", end='')
+        print()
+
+class player:
+    def __init__(self, color=None):
+        if color:
+            self.color = (0, 0, 255)
+            self.x = 2*cellsX//3
+            self.y = cellsY//3
+        else:
+            self.color = (randint(0, 255), randint(0, 255), randint(0, 255))
+            self.x = cellsX // 2
+            self.y = cellsY // 2
+        self.lives = 3
+        self.score = 0
+        self.reward = 0
+        self.deaths = 0
+        self.stagnation = 0
+        self.action = 0
+        self.living = True
+        self.observation = None
+        self.human = False
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
-        pygame.draw.circle(screen, colors['blue'], [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+        pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+        if self.reward < 0:
+            pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
+        if self.reward > 0:
+            pygame.draw.circle(screen, white, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
+        if self.lives > 0:
+            self.reward = 0
+            self.living = True
+            # if self.action != 0:
 
     def get_observable(self, state):
-        arr = [-1] * self.n
+        arr = [-1] * c1.n
         map = []
         i = 0
-        for row in range(self.y - self.r, self.y + self.r + 1):
+        for row in range(self.y - c1.r, self.y + c1.r + 1):
             temp = []
-            for col in range(self.x - self.r, self.x + self.r + 1):
+            for col in range(self.x - c1.r, self.x + c1.r + 1):
                 # try:
                 if state[col % cellsX, row % cellsY]:
                     arr[i] = state[col % cellsX, row % cellsY]
                 # except IndexError:
                 #     pass
-                inverse_radius = 1/(1+math.sqrt((row-self.y)**2 + (col-self.x)**2)/2)
+                inverse_radius = 1 / (1 + math.sqrt((row - self.y) ** 2 + (col - self.x) ** 2) / 2)
                 if arr[i] == -1:
                     arr[i] *= inverse_radius
                 temp.append(arr[i])
@@ -307,7 +474,13 @@ class player:
         map = np.array(map, np.float)
         arr = np.array(arr, np.float)
 
-        self.observation = arr.reshape(1, self.n)
+        self.observation = arr.reshape(1, c1.n)
+
+    def get_action(self):
+        if np.random.random() < eps or len(states) == 0:
+            self.action = np.random.choice(choices)
+        else:
+            self.action = np.argmax(c1.model.predict(self.observation)[0])
 
     def move_on_prediction(self, prediction):
         wall = 0
@@ -333,7 +506,8 @@ class player:
                 self.x = 0
 
 
-p1 = player()
+c1 = classroom()
+
 
 ### Welcome screen and game controls ###
 
@@ -378,6 +552,7 @@ def waitForTheUser():
             # Go to the next screen when any key is pressed
             elif event.type == pygame.KEYDOWN:
                 return
+
 
 
 # # Fonts:
@@ -448,7 +623,7 @@ def showControls():
 oof_sound = path + 'music' + os.sep + 'OOF.wav'
 ding_sound = path + 'music' + os.sep + 'ding.wav'
 pygame.mixer.init()
-pygame.mixer.music.set_volume(0.4)
+pygame.mixer.music.set_volume(0.3)
 
 
 ### Game execution ###
@@ -467,7 +642,7 @@ def drawCell(x, y):
         pygame.draw.polygon(screen, grey, poly[x, y], 1)
         if len(states) > 0:
             if states[-1][x, y] == 1:
-                pygame.draw.polygon(screen, colors['red'], poly[x, y], 0)
+                pygame.draw.polygon(screen, red, poly[x, y], 0)
                 pygame.draw.polygon(screen, grey, poly[x, y], 1)
     else:
         pygame.draw.polygon(screen, darkgrey, poly[x, y], 0)
@@ -481,15 +656,10 @@ def updateScreen():
     for y in range(0, cellsY):
         for x in range(0, cellsX):
             drawCell(x, y)
-    if p1.living:
-        p1.drawPlayer()
+    c1.draw_living()
 
     pygame.display.update()
 
-    if not p1.living or p1.stagnation > 100:
-        p1.stagnation = 0
-        # sleep(0.3)
-        restart_game()
 
 
 def liveNeighbors(x, y):
@@ -524,56 +694,33 @@ def updateGameState(newGameState):
 def nextGeneration():
     ''' Set the game state to the new generation and update the screen '''
     newGameState = numpy.copy(gameState)
-    reward = -.1
-    old_score = p1.score
+    reward = 0
 
     ''' Player decides on movement'''
-    p1.get_observable(gameState)
-
-    if np.random.random() < eps or len(states) == 0:
-        p1.action = np.random.choice(choices)
-    else:
-        p1.action = np.argmax(p1.model.predict(p1.observation)[0])
-
-    p1.move_on_prediction(p1.action)
+    c1.observe(gameState)
+    c1.act()
 
     ''' The field determines the quality of it's decission '''
     for y in range(0, cellsY):
         for x in range(0, cellsX):
             neighbors = liveNeighbors(x, y)
+
             # Any dead cell with 3 live neighbors becomes a live cell.
             if gameState[x, y] == 0 and neighbors == 3:
                 newGameState[x, y] = 1
-                if x == p1.x and y == p1.y and p1.living:
-                    reward = 10 * p1.woosh
-                    p1.woosh += 1
-                    p1.stagnation = 0
-                    p1.score += 1
+
             # Any live cell with less than 2 or more than 3 live neighbors dies.
             elif gameState[x, y] == 1 and (neighbors < 2 or neighbors > 3):
                 newGameState[x, y] = 0
-                if p1.x == x and p1.y == y and p1.living:
-                    p1.living = False
-                    p1.x = cellsX // 2
-                    p1.y = cellsY // 2
-                    p1.deaths += 1
-                    reward = -.5
-                    p1.stagnation = 0
-                    p1.woosh = 1
-                    # pygame.mixer.music.load(oof_sound)
-                    # pygame.mixer.music.play()
+                c1.punish_living(x, y)
 
-    if old_score == p1.score:
-        # No points scored
-        p1.woosh = 1
-        p1.stagnation += 1
-    else:
-        p1.woosh += 1
+            if newGameState[x, y]:
+                c1.reward_living(x, y)
 
     updateGameState(newGameState)
     updateScreen()
 
-    return newGameState, reward
+    return newGameState
 
 
 def toggleScreenMode():
@@ -688,8 +835,7 @@ def handle_user_input():
 
             # Save game when s is pressed
             elif event.key == pygame.K_s and not fullscreen:
-                filename = filedialog.asksaveasfilename(initialdir=savesDir, \
-                                                        defaultextension='.dat')
+                filename = filedialog.asksaveasfilename(initialdir=savesDir, defaultextension='.dat')
                 if filename:
                     data = (gameState, states, stepByStep, wraparound, delayInt)
                     try:
@@ -705,8 +851,7 @@ def handle_user_input():
             elif event.key == pygame.K_o and not fullscreen:
                 empty = len(os.listdir(savesDir)) == 0
                 firstFile = None if empty else sorted(os.listdir(savesDir))[0]
-                filename = filedialog.askopenfilename(initialdir=savesDir, \
-                                                      initialfile=firstFile)
+                filename = filedialog.askopenfilename(initialdir=savesDir, initialfile=firstFile)
                 if filename:
                     try:
                         data = ()
@@ -733,6 +878,25 @@ def handle_user_input():
             elif event.key == pygame.K_h:
                 showControls()
                 updateScreen()
+
+            elif c1.player1 and event.key == pygame.K_UP:
+                c1.students[0].action = 1
+
+            elif c1.player1 and event.key == pygame.K_DOWN:
+                c1.students[0].action = 2
+
+            elif c1.player1 and event.key == pygame.K_LEFT:
+                c1.students[0].action = 3
+
+            elif c1.player1 and event.key == pygame.K_RIGHT:
+                c1.students[0].action = 4
+
+    for student in c1.students:
+        if student.action != 0 and student.lives > 0:
+            student.living = True
+
+
+
     # Handle mouse dragging
     if mouseClicked:
         x, y = currentCell()
@@ -742,18 +906,19 @@ def handle_user_input():
 
 
 def restart_game():
-    global gamePaused
+    global gamePaused, safety_radius
     newGameState = numpy.random.choice \
         (a=[0, 1], size=(cellsX, cellsY))
-    newGameState[cellsY//2][cellsX//2] = 0
-    newGameState[cellsY//2][cellsX//2+1] = 0
-    newGameState[cellsY//2][cellsX//2-1] = 0
-    newGameState[cellsY//2+1][cellsX//2] = 0
-    newGameState[cellsY//2-1][cellsX//2] = 0
+    safety_radius *= .95
+    for x in range(int(cellsX//2-cellsX*safety_radius/2), int(cellsX//2+cellsX*safety_radius/2)):
+        for y in range(int(cellsY//2-cellsY*safety_radius/2), int(cellsY//2+cellsY*safety_radius/2)):
+            newGameState[x, y] = 0
 
-    p1.living = True
+    c1.resuscitate()
     updateGameState(newGameState)
     gamePaused = False
+    # pygame.mixer.music.load(oof_sound)
+    # pygame.mixer.music.play()
     updateScreen()
 
 
@@ -768,40 +933,27 @@ while True:
     if isTryingToQuit():
         sys.exit()
     handle_user_input()
+    before_scores = [s.score for s in c1.students]
 
     if not stepByStep and not gamePaused:
         if time() - lastTime > delay:
-            newGameState, reward = nextGeneration()
+            newGameState = nextGeneration()
             if len(states) > 1:
-                target = reward + discount_factor * np.max(p1.model.predict(p1.observation)[0])
-                target_vector = p1.model.predict(p1.observation)[0]
-                target_vector[p1.action] = target
-                tv = target_vector.reshape(-1, 5)
-                p1.model.fit(p1.observation, tv, epochs=1, verbose=0)
+                c1.update_model()
 
             lastTime = time()
 
-            if len(states)%100 == 1:
-                print('.', end='')
+    c1.report()
+    if len(states) >= 499 or c1.stagnation():
 
-    if len(states) >= 499:
-        pygame.mixer.music.load(ding_sound)
-        pygame.mixer.music.play()
-        print(f"\nScore: {p1.score} | Deaths: {p1.deaths} | S/D: {round(p1.score/p1.deaths,2)}")
-        model_json = p1.model.to_json()
+        c1.report_best()
+        model_json = c1.model.to_json()
         with open('gol.json', 'w') as json_file:
             json_file.write(model_json)
-        p1.model.save_weights('gol.h5')
-
-        p1.score = 0
-        p1.x = cellsX // 2
-        p1.y = cellsY // 2
-        p1.deaths = 0
-        p1.living = False
-        # p1.train_ai()
+        c1.model.save_weights('gol.h5')
+        restart_game()
+        c1.reset_students()
         states.clear()
         eps *= eps_decay_factor
 
 
-    # Sleep for a moment to avoid unnecessary computation
-    # sleep(0.0001)
