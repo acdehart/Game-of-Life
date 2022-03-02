@@ -246,10 +246,10 @@ def check_if_future_safe(choice, future):
 class classroom:
     def __init__(self):
         self.students = []
-        self.player1 = True
+        self.player1 = False
         if self.player1:
             self.students.append(player('blue'))
-        for _ in range(15):
+        for _ in range(50):
             self.students.append(player())
 
         self.r = 8
@@ -303,23 +303,20 @@ class classroom:
 
     def draw_scoreboard(self):
         font = pygame.font.Font('freesansbold.ttf', 32)
-        texts = []
         best = c1.report_best(verbose=False)
         for i, student in enumerate(c1.students):
             line = f"P{i + 1} {'I' * student.lives} {student.score}"
-            texts.append(line)
-        for i, text in enumerate(texts):
-            text = font.render(text, True, red, grey)
+            if student.score == best['max_score']:
+                line += " *"
+            text = font.render(line, True, student.color, grey)
             text.set_alpha(200)
             textRect = text.get_rect()
             textRect.y += i*32
-
             screen.blit(text, textRect)
 
     def draw_living(self):
         for student in self.students[::-1]:
-            if student.living:
-                student.drawPlayer()
+            student.drawPlayer()
 
     def count_living(self):
         living_count = 0
@@ -336,6 +333,11 @@ class classroom:
             student.living = True
             student.lives = 3
 
+    def rebase_students(self):
+        for student in self.students:
+            student.reward = 0
+            student.observation = None
+
     def observe(self, gameState):
         for student in self.students:
             if student.living:
@@ -346,16 +348,19 @@ class classroom:
 
     def act(self):
         for i, student in enumerate(self.students):
-            if not (self.player1 and i == 0):
+            if not (self.player1 and i == 0) and student.living:
                 student.get_action()
-            student.move_on_prediction(student.action)
-            student.action = None
+            if student.living:
+                student.move_on_prediction(student.action)
 
     def reward_living(self, x, y):
+        best = c1.report_best(verbose=False)
         for student in self.students:
             if x == student.x and y == student.y and student.living:
                 student.stagnation = 0
-                student.reward = 10
+                student.reward = student.score
+                if student.action == 0:
+                    student.reward *= 2
                 student.score += 1
 
     def punish_living(self, x, y):
@@ -363,12 +368,12 @@ class classroom:
             if student.x == x and student.y == y and student.living:
                 student.lives -= 1
                 student.reward = -.5
-                student.living = False
+                # student.living = False
 
                 if student.lives <= 0:
                     student.stagnation = 0
-                    student.x = cellsX // 2
-                    student.y = cellsY // 2
+                    student.x = cellsX*2
+                    student.y = cellsY*2
 
     def update_model(self):
         observations = []
@@ -456,15 +461,19 @@ class player:
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
-        pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
-        if self.reward < 0:
+        if self.lives >= 0:
+            pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+        if self.reward < 0 and self.lives >= 0:
             pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
-        if self.reward > 0:
+        if self.reward > 0 and self.lives >= 0:
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x + circ_rad-1, res * self.y, circ_rad*.25, circ_rad*2))
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x, res * self.y + circ_rad-1, circ_rad*2, circ_rad*0.25))
-        if self.lives > 0:
-            self.reward = 0
-            self.living = True
+        if self.lives <= 0:
+            self.living = False
+            self.lives = -1
+        # if self.lives > 0:
+        #     self.reward = 0
+        #     self.living = True
             # if self.action != 0:
 
     def get_observable(self, state):
@@ -905,7 +914,7 @@ def handle_user_input():
                 c1.students[0].action = 4
 
     for student in c1.students:
-        if student.action != 0 and student.lives > 0:
+        if student.action != 0 and student.lives >= 0:
             student.living = True
 
 
@@ -953,10 +962,11 @@ while True:
             newGameState = nextGeneration()
             if len(states) > 1:
                 c1.update_model()
+                c1.rebase_students()
 
             lastTime = time()
 
-    c1.report()
+    # c1.report()
     if len(states) >= 499 or c1.stagnation():
 
         c1.report_best()
