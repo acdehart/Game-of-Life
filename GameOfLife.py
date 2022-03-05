@@ -69,7 +69,7 @@ if os.path.exists(iconPath):
     pygame.display.set_icon(icon)
 windowSize = 800, 600
 res = 20
-players = 5
+players = 25
 width, height = windowSize
 safety_radius = 0.7
 screen = pygame.display.set_mode(windowSize)
@@ -258,6 +258,11 @@ class classroom:
         self.reporter.color = self.reporter.b_color
         self.reporter.living = False
         self.reporter.lives = -1
+        self.battle = 0
+        self.trials = 0
+        self.round = 0
+        self.observations = []
+        self.tvs = []
 
         self.r = (windowSize[1]//res)//2
         self.n = (self.r * 2 + 1) ** 2
@@ -336,23 +341,27 @@ class classroom:
                 text = font.render(line, True, student.color, grey)
             text.set_alpha(200)
             textRect = text.get_rect()
-            textRect.y += i*22
+            textRect.y += i*22+12
             screen.blit(text, textRect)
 
-        if self.reporter.score > 0:
-            report_line = f"Dead Team {self.reporter.score}"
-            font = pygame.font.Font('freesansbold.ttf', 12)
-            text = font.render(report_line, True, darkgrey, grey)
-            text.set_alpha(200)
-            textRect = text.get_rect()
-            textRect.y += i*22+22
-            screen.blit(text, textRect)
+        report_line = f"Round {self.battle}.{self.trials}.{self.round}"
+        font = pygame.font.Font('freesansbold.ttf', 12)
+        text = font.render(report_line, True, darkgrey, grey)
+        text.set_alpha(200)
+        textRect = text.get_rect()
+        textRect.y += 0
+        screen.blit(text, textRect)
 
     def draw_living(self):
         for student in self.students:
-            student.drawPlayer()
-        if self.reporter:
-            self.reporter.drawPlayer()
+            if student.color == student.b_color and not student.gold:
+                student.drawPlayer()
+        for student in self.students:
+            if student.color == student.a_color and not student.gold:
+                student.drawPlayer()
+        for student in self.students:
+            if student.gold:
+                student.drawPlayer()
 
     def count_living(self):
         living_count = 0
@@ -366,14 +375,27 @@ class classroom:
 
     def resuscitate(self):
         still_alive = False
+        max_score = 0
         for student in self.students:
+            if student.score > max_score:
+                max_score = student.score
             student.living = True
             student.lives = 3
             if student.color == student.a_color:
                 still_alive = True
-        if not still_alive:
+        if not still_alive or max_score >= 30:
+            self.round = 0
+            self.trials = 0
+            self.battle += 1
             for student in self.students:
                 student.color = student.a_color
+                student.score = 0
+            if len(self.observations) > 0:
+                observations = np.array(self.observations)[:, 0, :]
+                tvs = np.array(self.tvs)[:, 0, :]
+                c1.model.fit(observations, tvs, epochs=1, verbose=0)
+                self.observations = []
+                self.tvs = []
 
     def rebase_students(self):
         b_score = 0
@@ -383,6 +405,7 @@ class classroom:
             student.reward = 0
             student.observation = None
         self.reporter.score = b_score
+        self.round += 1
 
     def observe(self, gameState):
         for student in self.students:
@@ -422,25 +445,14 @@ class classroom:
                     student.y = cellsY*2
 
     def update_model(self):
-        observations = []
-        tvs = []
-
         for student in self.students:
             if student.living and student.reward != 0:
                 target = student.reward + discount_factor * np.max(c1.model.predict(student.observation)[0])
                 target_vector = c1.model.predict(student.observation)[0]
                 target_vector[student.action] = target
                 tv = target_vector.reshape(-1, 5)
-                observations.append(student.observation)
-                tvs.append(tv)
-
-        if len(observations) > 0:
-            observations = np.array(observations)[:, 0, :]
-            tvs = np.array(tvs)[:, 0, :]
-            c1.model.fit(observations, tvs, epochs=1, verbose=0)
-
-        # for student in c1.students:
-        #     student.reward = 0
+                self.observations.append(student.observation)
+                self.tvs.append(tv)
 
     def reset_students(self):
         b_count = 0
@@ -451,7 +463,7 @@ class classroom:
         for student in self.students:
             if b_count == len(self.students):
                 student.color = student.a_color
-            student.score = 0
+            # student.score = 0
             student.stagnation = 0
             student.deaths = 0
             student.x = cellsX//2 + randint(-5, 5)
@@ -471,7 +483,7 @@ class classroom:
             return True
 
         for student in self.students:
-            if student.score > 29:
+            if student.score >= 30:
                 print(f"Winner!... {student.score} points scored")
                 return True
 
@@ -500,7 +512,8 @@ class player:
             self.x = 2*cellsX//3
             self.y = cellsY//3
         else:
-            self.a_color = tuple([randint(129, 255), randint(0, 128), randint(0, 128)])
+            a = randint(0, 255)
+            self.a_color = tuple([a, 255-a, randint(0, 255)])
             # self.b_color = tuple([128, max(self.a_color[1]*2, 255), 255-self.a_color[2]])
             self.b_color = darkgrey
             self.color = self.a_color
@@ -998,6 +1011,8 @@ def restart_game():
     for x in range(int(cellsX//2-cellsX*safety_radius/2), int(cellsX//2+cellsX*safety_radius/2)):
         for y in range(int(cellsY//2-cellsY*safety_radius/2), int(cellsY//2+cellsY*safety_radius/2)):
             newGameState[x, y] = 0
+    c1.round = 0
+    c1.trials += 1
 
     c1.resuscitate()
     updateGameState(newGameState)
