@@ -326,14 +326,26 @@ class classroom:
     def draw_scoreboard(self):
         font = pygame.font.Font('freesansbold.ttf', 22)
         best = c1.report_best(verbose=False)
-        for i, student in enumerate(c1.students):
+        for i, student in enumerate(self.students):
             line = f"P{i + 1} {'I' * student.lives} {student.score}"
             if student.score == best['max_score']:
                 line += " *"
-            text = font.render(line, True, student.color, grey)
+            if student.gold:
+                text = font.render(line, True, (255, 255, 0), grey)
+            else:
+                text = font.render(line, True, student.color, grey)
             text.set_alpha(200)
             textRect = text.get_rect()
             textRect.y += i*22
+            screen.blit(text, textRect)
+
+        if self.reporter.score > 0:
+            report_line = f"Dead Team {self.reporter.score}"
+            font = pygame.font.Font('freesansbold.ttf', 12)
+            text = font.render(report_line, True, darkgrey, grey)
+            text.set_alpha(200)
+            textRect = text.get_rect()
+            textRect.y += i*22+22
             screen.blit(text, textRect)
 
     def draw_living(self):
