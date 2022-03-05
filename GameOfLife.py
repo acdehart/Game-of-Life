@@ -1,4 +1,5 @@
 import math
+import random
 from random import randint
 from tkinter import filedialog
 from tkinter import messagebox
@@ -255,6 +256,8 @@ class classroom:
             self.students.append(player())
 
         self.reporter = player()
+        self.ticker = []
+        self.ticker_norm = None
         self.reporter.color = self.reporter.b_color
         self.reporter.living = False
         self.reporter.lives = -1
@@ -323,6 +326,11 @@ class classroom:
                 pygame.mixer.music.load(ding_sound)
                 pygame.mixer.music.play()
                 pygame.mixer.music.set_volume(0.05)
+            else:
+                pygame.mixer.music.set_volume(0.05)
+                pygame.mixer.music.load(oof_sound)
+                pygame.mixer.music.play()
+                pygame.mixer.music.set_volume(0.5)
 
                 sleep(5)
 
@@ -351,6 +359,17 @@ class classroom:
         textRect = text.get_rect()
         textRect.y += 0
         screen.blit(text, textRect)
+
+        for i, num in enumerate(self.ticker):
+            ticker_line = f"{num}"
+            font = pygame.font.Font('freesansbold.ttf', 10)
+            text = font.render(ticker_line, True, darkgrey, grey)
+            text.set_alpha(200)
+            textRect = text.get_rect()
+            textRect.y += windowSize[1]-res//2
+            textRect.x += i*res
+            screen.blit(text, textRect)
+
 
     def draw_living(self):
         for student in self.students:
@@ -384,6 +403,7 @@ class classroom:
             if student.color == student.a_color:
                 still_alive = True
         if not still_alive or max_score >= 30:
+            self.ticker.append(self.trials)
             self.round = 0
             self.trials = 0
             self.battle += 1
@@ -441,8 +461,11 @@ class classroom:
 
                 if student.lives <= 0:
                     student.stagnation = 0
-                    student.x = cellsX*2
-                    student.y = cellsY*2
+                    student.score = 0
+                    # student.x = random.choice([-cellsX, 2*cellsX])
+                    # student.y = random.choice([-cellsY, 2*cellsY])
+                    # student.x = cellsX*2
+                    # student.y = cellsY*2
 
     def update_model(self):
         for student in self.students:
@@ -534,19 +557,15 @@ class player:
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
 
-        if self.lives >= 0:
-            pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
-        if self.reward < 0 and self.lives >= 0:
+        pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+        if self.reward < 0:
             pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
-        if self.reward > 0 and self.lives >= 0:
+        if self.reward > 0:
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x + circ_rad-1, res * self.y, circ_rad*.25, circ_rad*2))
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x, res * self.y + circ_rad-1, circ_rad*2, circ_rad*0.25))
         if self.lives <= 0:
-            if self.living:
-                pygame.mixer.music.load(oof_sound)
-                pygame.mixer.music.play()
-                self.color = self.b_color
-            self.living = False
+            self.color = self.b_color
+            # self.score = max(0, self.score)
             self.lives = -1
 
         if self.gold:
@@ -1011,13 +1030,13 @@ def restart_game():
     for x in range(int(cellsX//2-cellsX*safety_radius/2), int(cellsX//2+cellsX*safety_radius/2)):
         for y in range(int(cellsY//2-cellsY*safety_radius/2), int(cellsY//2+cellsY*safety_radius/2)):
             newGameState[x, y] = 0
-    c1.round = 0
-    c1.trials += 1
+    c1.trials += 1\
 
     c1.resuscitate()
     updateGameState(newGameState)
     gamePaused = False
     updateScreen()
+    c1.round = 0
 
 
 discount_factor = 0.95
