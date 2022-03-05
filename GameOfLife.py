@@ -254,11 +254,10 @@ class classroom:
         for _ in range(players):
             self.students.append(player())
 
-        b_report = player()
-        b_report.color = b_report.b_color
-        b_report.living = False
-        b_report.lives = -1
-        self.students.append(b_report)
+        self.reporter = player()
+        self.reporter.color = self.reporter.b_color
+        self.reporter.living = False
+        self.reporter.lives = -1
 
         self.r = (windowSize[1]//res)//2
         self.n = (self.r * 2 + 1) ** 2
@@ -294,8 +293,7 @@ class classroom:
             if student.score > max_score:
                 max_score = student.score
                 winner = i+1
-                if student.score != self.students[-1].score:
-                    student.color = (255, 255, 0)
+                student.gold = True
 
                 living_winner = winner
                 max_living_score = max_score
@@ -304,9 +302,9 @@ class classroom:
                     max_living_score = student.score
         for student in self.students:
             if student.living and student.score != max_score:
-                student.color = student.a_color
+                student.gold = False
             if not student.living and student.score != max_score:
-                student.color = student.b_color
+                student.gold = False
 
         report = f"P{winner} in the lead with {max_score}!"
 
@@ -339,8 +337,10 @@ class classroom:
             screen.blit(text, textRect)
 
     def draw_living(self):
-        for student in self.students[::-1]:
+        for student in self.students:
             student.drawPlayer()
+        if self.reporter:
+            self.reporter.drawPlayer()
 
     def count_living(self):
         living_count = 0
@@ -353,18 +353,24 @@ class classroom:
         return self.count_living() / len(self.students)
 
     def resuscitate(self):
-        for student in self.students[:-1]:
+        still_alive = False
+        for student in self.students:
             student.living = True
             student.lives = 3
+            if student.color == student.a_color:
+                still_alive = True
+        if not still_alive:
+            for student in self.students:
+                student.color = student.a_color
 
     def rebase_students(self):
         b_score = 0
-        for student in self.students[:-1]:
+        for student in self.students:
             if student.color == student.b_color:
                 b_score += student.score
             student.reward = 0
             student.observation = None
-        self.students[-1].score = b_score
+        self.reporter.score = b_score
 
     def observe(self, gameState):
         for student in self.students:
@@ -416,7 +422,7 @@ class classroom:
                 observations.append(student.observation)
                 tvs.append(tv)
 
-        if len(observations)>0:
+        if len(observations) > 0:
             observations = np.array(observations)[:, 0, :]
             tvs = np.array(tvs)[:, 0, :]
             c1.model.fit(observations, tvs, epochs=1, verbose=0)
@@ -453,7 +459,7 @@ class classroom:
             return True
 
         for student in self.students:
-            if student.score > 29 and student.score != self.students[-1].score:
+            if student.score > 29:
                 print(f"Winner!... {student.score} points scored")
                 return True
 
@@ -492,6 +498,7 @@ class player:
         self.lives = 3
         self.score = 0
         self.reward = 0
+        self.gold = False
         self.deaths = 0
         self.stagnation = 0
         self.action = 0
@@ -501,10 +508,6 @@ class player:
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
-
-        if self.color == (255, 255, 0):
-            pass
-            # print crown
 
         if self.lives >= 0:
             pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
@@ -520,10 +523,9 @@ class player:
                 self.color = self.b_color
             self.living = False
             self.lives = -1
-        # if self.lives > 0:
-        #     self.reward = 0
-        #     self.living = True
-            # if self.action != 0:
+
+        if self.gold:
+            pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(res * self.x + circ_rad//2, res * self.y-1, circ_rad, circ_rad//2))
 
     def get_observable(self, state):
         arr = [-1] * c1.n
