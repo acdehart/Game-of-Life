@@ -15,6 +15,7 @@ import tensorflow as tf
 from tensorflow.keras.models import model_from_json
 
 tf.get_logger().setLevel('INFO')
+from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import InputLayer
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
@@ -68,6 +69,7 @@ if os.path.exists(iconPath):
     pygame.display.set_icon(icon)
 windowSize = 800, 600
 res = 20
+players = 5
 width, height = windowSize
 safety_radius = 0.7
 screen = pygame.display.set_mode(windowSize)
@@ -249,10 +251,16 @@ class classroom:
         self.player1 = False
         if self.player1:
             self.students.append(player('blue'))
-        for _ in range(50):
+        for _ in range(players):
             self.students.append(player())
 
-        self.r = 8
+        b_report = player()
+        b_report.color = b_report.b_color
+        b_report.living = False
+        b_report.lives = -1
+        self.students.append(b_report)
+
+        self.r = (windowSize[1]//res)//2
         self.n = (self.r * 2 + 1) ** 2
         if os.path.isfile('gol.h5'):
             json_file = open('gol.json', 'r')
@@ -263,11 +271,15 @@ class classroom:
             print('Loaded existing model')
         else:
             self.model = Sequential()
+
             self.model.add(InputLayer(batch_input_shape=(1, self.n)))
-            self.model.add(
-                Dense(self.n + 5, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
-            self.model.add(
-                Dense(self.n // 2 + 5, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            # self.model.add(Dropout(0.2, batch_input_shape=(1, self.n)))
+            self.model.add(Dense(self.n*3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(Dropout(0.2))
+            self.model.add(Dense(self.n*3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(Dropout(0.2))
+            self.model.add(Dense(self.n*3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(Dropout(0.2))
             self.model.add(Dense(5, activation='linear'))
 
         self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
@@ -281,12 +293,21 @@ class classroom:
         for i, student in enumerate(self.students):
             if student.score > max_score:
                 max_score = student.score
-                max_living_score = max_score
                 winner = i+1
+                if student.score != self.students[-1].score:
+                    student.color = (255, 255, 0)
+
                 living_winner = winner
+                max_living_score = max_score
                 if student.living:
                     living_winner = i+1
                     max_living_score = student.score
+        for student in self.students:
+            if student.living and student.score != max_score:
+                student.color = student.a_color
+            if not student.living and student.score != max_score:
+                student.color = student.b_color
+
         report = f"P{winner} in the lead with {max_score}!"
 
         if living_winner:
@@ -295,14 +316,17 @@ class classroom:
         if verbose:
             print(report)
             if max_score > 29:
+                pygame.mixer.music.set_volume(0.5)
                 pygame.mixer.music.load(ding_sound)
                 pygame.mixer.music.play()
+                pygame.mixer.music.set_volume(0.05)
+
                 sleep(5)
 
         return {'winner': winner, 'max_score': max_score}
 
     def draw_scoreboard(self):
-        font = pygame.font.Font('freesansbold.ttf', 32)
+        font = pygame.font.Font('freesansbold.ttf', 22)
         best = c1.report_best(verbose=False)
         for i, student in enumerate(c1.students):
             line = f"P{i + 1} {'I' * student.lives} {student.score}"
@@ -311,7 +335,7 @@ class classroom:
             text = font.render(line, True, student.color, grey)
             text.set_alpha(200)
             textRect = text.get_rect()
-            textRect.y += i*32
+            textRect.y += i*22
             screen.blit(text, textRect)
 
     def draw_living(self):
@@ -329,14 +353,18 @@ class classroom:
         return self.count_living() / len(self.students)
 
     def resuscitate(self):
-        for student in self.students:
+        for student in self.students[:-1]:
             student.living = True
             student.lives = 3
 
     def rebase_students(self):
-        for student in self.students:
+        b_score = 0
+        for student in self.students[:-1]:
+            if student.color == student.b_color:
+                b_score += student.score
             student.reward = 0
             student.observation = None
+        self.students[-1].score = b_score
 
     def observe(self, gameState):
         for student in self.students:
@@ -397,7 +425,14 @@ class classroom:
         #     student.reward = 0
 
     def reset_students(self):
+        b_count = 0
+        for s in self.students:
+            if s.color[0] == 128:
+                b_count += 1
+
         for student in self.students:
+            if b_count == len(self.students):
+                student.color = student.a_color
             student.score = 0
             student.stagnation = 0
             student.deaths = 0
@@ -410,16 +445,16 @@ class classroom:
         best = self.report_best(verbose=False)
 
         if self.count_living() <= 1:
-            print(f"Stagnation... P{best['winner']} Last Alive with {best['max_score']}")
+            print(f"P{best['winner']} Last Alive with {best['max_score']}")
             return True
 
         if min_stagnation > 30:
-            print("Stagnation... No points scored")
+            print("Stagnation... No points scored in 30 rounds")
             return True
 
         for student in self.students:
-            if student.score > 29:
-                print(f"Stagnation... {student.score} points scored")
+            if student.score > 29 and student.score != self.students[-1].score:
+                print(f"Winner!... {student.score} points scored")
                 return True
 
         return False
@@ -439,6 +474,7 @@ class classroom:
                 print(f"   {'I'*s.lives}    {s.score} | ", end='')
         print()
 
+
 class player:
     def __init__(self, color=None):
         if color:
@@ -446,9 +482,13 @@ class player:
             self.x = 2*cellsX//3
             self.y = cellsY//3
         else:
-            self.color = (randint(0, 255), randint(0, 255), randint(0, 255))
+            self.a_color = tuple([randint(129, 255), randint(0, 128), randint(0, 128)])
+            # self.b_color = tuple([128, max(self.a_color[1]*2, 255), 255-self.a_color[2]])
+            self.b_color = darkgrey
+            self.color = self.a_color
             self.x = cellsX // 2
             self.y = cellsY // 2
+        self.team = None
         self.lives = 3
         self.score = 0
         self.reward = 0
@@ -461,6 +501,11 @@ class player:
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
+
+        if self.color == (255, 255, 0):
+            pass
+            # print crown
+
         if self.lives >= 0:
             pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
         if self.reward < 0 and self.lives >= 0:
@@ -469,6 +514,10 @@ class player:
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x + circ_rad-1, res * self.y, circ_rad*.25, circ_rad*2))
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x, res * self.y + circ_rad-1, circ_rad*2, circ_rad*0.25))
         if self.lives <= 0:
+            if self.living:
+                pygame.mixer.music.load(oof_sound)
+                pygame.mixer.music.play()
+                self.color = self.b_color
             self.living = False
             self.lives = -1
         # if self.lives > 0:
@@ -646,7 +695,7 @@ def showControls():
 oof_sound = path + 'music' + os.sep + 'OOF.wav'
 ding_sound = path + 'music' + os.sep + 'ding.wav'
 pygame.mixer.init()
-pygame.mixer.music.set_volume(0.3)
+pygame.mixer.music.set_volume(0.05)
 
 
 ### Game execution ###
@@ -939,8 +988,6 @@ def restart_game():
     c1.resuscitate()
     updateGameState(newGameState)
     gamePaused = False
-    # pygame.mixer.music.load(oof_sound)
-    # pygame.mixer.music.play()
     updateScreen()
 
 
