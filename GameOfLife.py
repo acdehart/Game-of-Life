@@ -123,6 +123,7 @@ gameState = numpy.zeros((cellsX, cellsY), int)
 # Values to serialize:
 stepByStep = False
 wraparound = True
+overlay = False
 delayInt = 1  # Speed
 
 # Other values:
@@ -249,11 +250,12 @@ def check_if_future_safe(choice, future):
 class classroom:
     def __init__(self):
         self.students = []
-        self.player1 = False
-        if self.player1:
-            self.students.append(player('blue'))
         for _ in range(players):
-            self.students.append(player())
+            p = player()
+            p.x = randint(0, cellsX/2)
+            p.y = randint(0, cellsY/2)
+
+            self.students.append(p)
 
         self.reporter = player()
         self.ticker = []
@@ -341,7 +343,7 @@ class classroom:
         best = c1.report_best(verbose=False)
         for i, student in enumerate(self.students):
             line = f"P{i + 1} {'I' * student.lives} {student.score}"
-            if student.score == best['max_score']:
+            if student.score == best['max_score'] and best['max_score'] >= 30:
                 line += " *"
             if student.gold:
                 text = font.render(line, True, (255, 255, 0), grey)
@@ -370,8 +372,13 @@ class classroom:
             textRect.x += i*res
             screen.blit(text, textRect)
 
-
     def draw_living(self):
+        if p1:
+            p1.drawPlayer()
+        if len(locations) > 0:
+            for loc in locations:
+                loc.drawPlayer()
+
         for student in self.students:
             if student.color == student.b_color and not student.gold:
                 student.drawPlayer()
@@ -403,7 +410,8 @@ class classroom:
             if student.color == student.a_color:
                 still_alive = True
         if not still_alive or max_score >= 30:
-            self.ticker.append(self.trials)
+            if max_score >= 30:
+                self.ticker.append(len(self.observations))
             self.round = 0
             self.trials = 0
             self.battle += 1
@@ -419,10 +427,12 @@ class classroom:
 
     def rebase_students(self):
         b_score = 0
+        p1.action = 0
         for student in self.students:
             if student.color == student.b_color:
                 b_score += student.score
             student.reward = 0
+            student.action = 0
             student.observation = None
         self.reporter.score = b_score
         self.round += 1
@@ -437,10 +447,12 @@ class classroom:
 
     def act(self):
         for i, student in enumerate(self.students):
-            if not (self.player1 and i == 0) and student.living:
+            if student.living:
                 student.get_action()
             if student.living:
                 student.move_on_prediction(student.action)
+        if p1.living:
+            p1.move_on_prediction(p1.action)
 
     def reward_living(self, x, y):
         best = c1.report_best(verbose=False)
@@ -489,26 +501,29 @@ class classroom:
             # student.score = 0
             student.stagnation = 0
             student.deaths = 0
-            student.x = cellsX//2 + randint(-5, 5)
-            student.y = cellsY//2 + randint(-5, 5)
+            # student.x = cellsX//2 + randint(-5, 5)
+            # student.y = cellsY//2 + randint(-5, 5)
+            student.x = randint([0, cellsX/2])
+            student.y = randint([0, cellsY/2])
         self.resuscitate()
 
     def stagnation(self):
         min_stagnation = self.get_min_stag()
         best = self.report_best(verbose=False)
 
-        if self.count_living() <= 1:
-            print(f"P{best['winner']} Last Alive with {best['max_score']}")
-            return True
-
-        if min_stagnation > 30:
-            print("Stagnation... No points scored in 30 rounds")
-            return True
-
-        for student in self.students:
-            if student.score >= 30:
-                print(f"Winner!... {student.score} points scored")
+        if not p1:
+            if self.count_living() <= 1:
+                print(f"P{best['winner']} Last Alive with {best['max_score']}")
                 return True
+
+            if min_stagnation > 30:
+                print("Stagnation... No points scored in 30 rounds")
+                return True
+
+            for student in self.students:
+                if student.score >= 30:
+                    print(f"Winner!... {student.score} points scored")
+                    return True
 
         return False
 
@@ -535,8 +550,9 @@ class player:
             self.x = 2*cellsX//3
             self.y = cellsY//3
         else:
-            a = randint(0, 255)
-            self.a_color = tuple([a, 255-a, randint(0, 255)])
+            a = randint(0, 128)
+            self.a_color = tuple([a, 128, 128-a])
+            # self.a_color = tuple([a, 255-a, randint(0, 255)])
             # self.b_color = tuple([128, max(self.a_color[1]*2, 255), 255-self.a_color[2]])
             self.b_color = darkgrey
             self.color = self.a_color
@@ -558,18 +574,26 @@ class player:
         ''' Draw player's cell with coordinates (x, y) '''
 
         pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
-        if self.reward < 0:
+        if self.reward < 0 and overlay:
             pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
-        if self.reward > 0:
+        if self.reward > 0 and overlay:
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x + circ_rad-1, res * self.y, circ_rad*.25, circ_rad*2))
             pygame.draw.rect(screen, white, pygame.Rect(res * self.x, res * self.y + circ_rad-1, circ_rad*2, circ_rad*0.25))
         if self.lives <= 0:
             self.color = self.b_color
-            # self.score = max(0, self.score)
             self.lives = -1
-
-        if self.gold:
+        if self.gold and overlay:
             pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(res * self.x + circ_rad//2, res * self.y-1, circ_rad, circ_rad//2))
+
+    def draw_scoreboard(self):
+        font = pygame.font.Font('freesansbold.ttf', 22)
+        line = "Player1 "
+        text = font.render(line, True, p1.color, grey)
+        text.set_alpha(200)
+        textRect = text.get_rect()
+        textRect.x += windowSize[0]*5/6
+        textRect.y += res
+        screen.blit(text, textRect)
 
     def get_observable(self, state):
         arr = [-1] * c1.n
@@ -605,26 +629,33 @@ class player:
         if prediction == 1:  # UP
             if self.y > wall:
                 self.y -= 1
-            else:
+            elif not p1:
                 self.y = cellsY - 1
         if prediction == 2:  # DOWN
-            if self.y < cellsY - wall:
+            if self.y <= cellsY - wall:
                 self.y += 1
-            else:
+            elif not p1:
                 self.y = 0
         if prediction == 3:  # LEFT
             if self.x > wall:
                 self.x -= 1
-            else:
+            elif not p1:
                 self.x = cellsX - 1
         if prediction == 4:  # RIGHT
-            if self.x < cellsX - wall:
+            if self.x <= cellsX - wall:
                 self.x += 1
-            else:
+            elif not p1:
                 self.x = 0
 
 
+locations = []
 c1 = classroom()
+p1 = player()
+p1.x = cellsX-1
+p1.y = cellsY-1
+p1.human = True
+p1.color = (0, 0, 128)
+
 
 
 ### Welcome screen and game controls ###
@@ -775,7 +806,10 @@ def updateScreen():
         for x in range(0, cellsX):
             drawCell(x, y)
     c1.draw_living()
-    c1.draw_scoreboard()
+    if overlay:
+        c1.draw_scoreboard()
+    if p1:
+        p1.draw_scoreboard()
     pygame.display.update()
 
 
@@ -996,17 +1030,17 @@ def handle_user_input():
                 showControls()
                 updateScreen()
 
-            elif c1.player1 and event.key == pygame.K_UP:
-                c1.students[0].action = 1
+            elif p1 and event.key == pygame.K_UP:
+                p1.action = 1
 
-            elif c1.player1 and event.key == pygame.K_DOWN:
-                c1.students[0].action = 2
+            elif p1 and event.key == pygame.K_DOWN:
+                p1.action = 2
 
-            elif c1.player1 and event.key == pygame.K_LEFT:
-                c1.students[0].action = 3
+            elif p1 and event.key == pygame.K_LEFT:
+                p1.action = 3
 
-            elif c1.player1 and event.key == pygame.K_RIGHT:
-                c1.students[0].action = 4
+            elif p1 and event.key == pygame.K_RIGHT:
+                p1.action = 4
 
     for student in c1.students:
         if student.action != 0 and student.lives >= 0:
