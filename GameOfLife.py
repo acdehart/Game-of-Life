@@ -5,6 +5,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 from collections import deque
 from time import time, sleep
+# from sound import Sound
 
 import cv2
 import numpy as np
@@ -13,6 +14,7 @@ import pygame, numpy, tkinter
 import os, sys, pickle
 
 import tensorflow as tf
+from PySide2.QtWidgets import QMessageBox
 from tensorflow.keras.models import model_from_json
 
 tf.get_logger().setLevel('INFO')
@@ -48,6 +50,7 @@ grey = 128, 128, 128
 darkgrey = 200, 200, 200
 black = 0, 0, 0
 red = 128, 0, 0
+grass = 0, 100, 0
 
 colors = {}
 colors['blue'] = 0, 0, 128
@@ -68,9 +71,10 @@ pygame.display.set_caption(windowTitle)
 if os.path.exists(iconPath):
     icon = pygame.image.load(iconPath)
     pygame.display.set_icon(icon)
-windowSize = 800, 600
+windowSize = 300, 200
 res = 20
-players = 25
+max_hp = 3
+players = 2
 width, height = windowSize
 safety_radius = 0.7
 screen = pygame.display.set_mode(windowSize)
@@ -127,7 +131,8 @@ overlay = False
 delayInt = 1  # Speed
 
 # Other values:
-delay = 0.001
+default_delay = 0.1
+delay = default_delay
 gamePaused = False
 mouseClicked = False
 fullscreen = False
@@ -159,12 +164,12 @@ gameState[7, 6] = 1
 gameState[7, 7] = 1
 gameState[8, 6] = 1
 # Microscope:
-gameState[19, 8] = 1
-gameState[20, 5] = 1
-gameState[20, 6] = 1
-gameState[20, 8] = 1
-gameState[21, 7] = 1
-gameState[21, 8] = 1
+# gameState[19, 8] = 1
+# gameState[20, 5] = 1
+# gameState[20, 6] = 1
+# gameState[20, 8] = 1
+# gameState[21, 7] = 1
+# gameState[21, 8] = 1
 # Glider:
 gameState[cellsX - 10 + 1, 8] = 1
 gameState[cellsX - 10 + 2, 6] = 1
@@ -172,40 +177,40 @@ gameState[cellsX - 10 + 2, 8] = 1
 gameState[cellsX - 10 + 3, 7] = 1
 gameState[cellsX - 10 + 3, 8] = 1
 # Lotus flower
-gameState[6, 20] = 1
-gameState[6, 21] = 1
-gameState[7, 19] = 1
-gameState[7, 20] = 1
-gameState[7, 22] = 1
-gameState[8, 20] = 1
-gameState[8, 21] = 1
+# gameState[6, 20] = 1
+# gameState[6, 21] = 1
+# gameState[7, 19] = 1
+# gameState[7, 20] = 1
+# gameState[7, 22] = 1
+# gameState[8, 20] = 1
+# gameState[8, 21] = 1
 # Pentadecathlon
-gameState[19, 17] = 1
-gameState[19, 18] = 1
-gameState[19, 19] = 1
-gameState[19, 20] = 1
-gameState[19, 21] = 1
-gameState[19, 22] = 1
-gameState[19, 23] = 1
-gameState[19, 24] = 1
-gameState[20, 17] = 1
-gameState[20, 19] = 1
-gameState[20, 20] = 1
-gameState[20, 21] = 1
-gameState[20, 22] = 1
-gameState[20, 24] = 1
-gameState[21, 17] = 1
-gameState[21, 18] = 1
-gameState[21, 19] = 1
-gameState[21, 20] = 1
-gameState[21, 21] = 1
-gameState[21, 22] = 1
-gameState[21, 23] = 1
-gameState[21, 24] = 1
+# gameState[19, 17] = 1
+# gameState[19, 18] = 1
+# gameState[19, 19] = 1
+# gameState[19, 20] = 1
+# gameState[19, 21] = 1
+# gameState[19, 22] = 1
+# gameState[19, 23] = 1
+# gameState[19, 24] = 1
+# gameState[20, 17] = 1
+# gameState[20, 19] = 1
+# gameState[20, 20] = 1
+# gameState[20, 21] = 1
+# gameState[20, 22] = 1
+# gameState[20, 24] = 1
+# gameState[21, 17] = 1
+# gameState[21, 18] = 1
+# gameState[21, 19] = 1
+# gameState[21, 20] = 1
+# gameState[21, 21] = 1
+# gameState[21, 22] = 1
+# gameState[21, 23] = 1
+# gameState[21, 24] = 1
 # Blinker:
-gameState[cellsX - 10 + 2, 19] = 1
-gameState[cellsX - 10 + 2, 20] = 1
-gameState[cellsX - 10 + 2, 21] = 1
+# gameState[cellsX - 10 + 2, 19] = 1
+# gameState[cellsX - 10 + 2, 20] = 1
+# gameState[cellsX - 10 + 2, 21] = 1
 
 circ_rad = 10
 
@@ -249,19 +254,14 @@ def check_if_future_safe(choice, future):
 
 class classroom:
     def __init__(self):
-        self.students = []
-        for _ in range(players):
-            p = player()
-            p.x = randint(0, cellsX/2)
-            p.y = randint(0, cellsY/2)
-
-            self.students.append(p)
+        self.init_students()
 
         self.reporter = player()
         self.ticker = []
         self.ticker_norm = None
         self.reporter.color = self.reporter.b_color
         self.reporter.living = False
+        self.transition = False
         self.reporter.lives = -1
         self.battle = 0
         self.trials = 0
@@ -269,7 +269,7 @@ class classroom:
         self.observations = []
         self.tvs = []
 
-        self.r = (windowSize[1]//res)//2
+        self.r = (windowSize[1] // res) // 2
         self.n = (self.r * 2 + 1) ** 2
         if os.path.isfile('gol.h5'):
             json_file = open('gol.json', 'r')
@@ -283,15 +283,26 @@ class classroom:
 
             self.model.add(InputLayer(batch_input_shape=(1, self.n)))
             # self.model.add(Dropout(0.2, batch_input_shape=(1, self.n)))
-            self.model.add(Dense(self.n*3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(
+                Dense(self.n * 3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
             self.model.add(Dropout(0.2))
-            self.model.add(Dense(self.n*3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(
+                Dense(self.n * 3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
             self.model.add(Dropout(0.2))
-            self.model.add(Dense(self.n*3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
+            self.model.add(
+                Dense(self.n * 3, activation='relu', kernel_initializer='random_normal', bias_initializer='zeros'))
             self.model.add(Dropout(0.2))
             self.model.add(Dense(5, activation='linear'))
 
         self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+
+    def init_students(self):
+        self.students = []
+        for _ in range(players):
+            p = player()
+            p.x = randint(0, cellsX // 2)
+            p.y = randint(0, cellsY // 2)
+            self.students.append(p)
 
     def report_best(self, verbose=True):
         max_score = 0
@@ -302,13 +313,13 @@ class classroom:
         for i, student in enumerate(self.students):
             if student.score > max_score:
                 max_score = student.score
-                winner = i+1
+                winner = i + 1
                 student.gold = True
 
                 living_winner = winner
                 max_living_score = max_score
                 if student.living:
-                    living_winner = i+1
+                    living_winner = i + 1
                     max_living_score = student.score
         for student in self.students:
             if student.living and student.score != max_score:
@@ -323,16 +334,16 @@ class classroom:
 
         if verbose:
             print(report)
-            if max_score > 29:
-                pygame.mixer.music.set_volume(0.5)
+            if (not p1 and max_living_score > 29):
                 pygame.mixer.music.load(ding_sound)
                 pygame.mixer.music.play()
-                pygame.mixer.music.set_volume(0.05)
-            else:
-                pygame.mixer.music.set_volume(0.05)
+                # if p1.x == locations[0].x and p1.y == locations[0].y:
+                if p1:
+                    p1.x = cellsX - 1
+                    p1.y = cellsY - 1
+            elif (p1 and not p1.living) or (p1 and max_living_score > 29):
                 pygame.mixer.music.load(oof_sound)
                 pygame.mixer.music.play()
-                pygame.mixer.music.set_volume(0.5)
 
                 sleep(5)
 
@@ -341,6 +352,7 @@ class classroom:
     def draw_scoreboard(self):
         font = pygame.font.Font('freesansbold.ttf', 22)
         best = c1.report_best(verbose=False)
+
         for i, student in enumerate(self.students):
             line = f"P{i + 1} {'I' * student.lives} {student.score}"
             if student.score == best['max_score'] and best['max_score'] >= 30:
@@ -351,7 +363,7 @@ class classroom:
                 text = font.render(line, True, student.color, grey)
             text.set_alpha(200)
             textRect = text.get_rect()
-            textRect.y += i*22+12
+            textRect.y += i * 22 + 12
             screen.blit(text, textRect)
 
         report_line = f"Round {self.battle}.{self.trials}.{self.round}"
@@ -368,26 +380,30 @@ class classroom:
             text = font.render(ticker_line, True, darkgrey, grey)
             text.set_alpha(200)
             textRect = text.get_rect()
-            textRect.y += windowSize[1]-res//2
-            textRect.x += i*res
+            textRect.y += windowSize[1] - res // 2
+            textRect.x += i * res
             screen.blit(text, textRect)
 
     def draw_living(self):
-        if p1:
-            p1.drawPlayer()
         if len(locations) > 0:
             for loc in locations:
                 loc.drawPlayer()
-
-        for student in self.students:
-            if student.color == student.b_color and not student.gold:
-                student.drawPlayer()
-        for student in self.students:
-            if student.color == student.a_color and not student.gold:
-                student.drawPlayer()
-        for student in self.students:
-            if student.gold:
-                student.drawPlayer()
+        if not p1:
+            for student in self.students:
+                if student.color == student.b_color and not student.gold:
+                    student.drawPlayer()
+            for student in self.students:
+                if student.color == student.a_color and not student.gold:
+                    student.drawPlayer()
+            for student in self.students:
+                if student.gold:
+                    student.drawPlayer()
+        if p1:
+            for student in self.students:
+                if student.hp > 0:
+                    student.drawPlayer()
+            if p1.living:
+                p1.drawPlayer()
 
     def count_living(self):
         living_count = 0
@@ -409,7 +425,7 @@ class classroom:
             student.lives = 3
             if student.color == student.a_color:
                 still_alive = True
-        if not still_alive or max_score >= 30:
+        if not still_alive or max_score >= 30 or (p1 and p1.x == locations[0].x and p1.y == locations[0].y):
             if max_score >= 30:
                 self.ticker.append(len(self.observations))
             self.round = 0
@@ -427,7 +443,8 @@ class classroom:
 
     def rebase_students(self):
         b_score = 0
-        p1.action = 0
+        if p1:
+            p1.action = 0
         for student in self.students:
             if student.color == student.b_color:
                 b_score += student.score
@@ -451,7 +468,7 @@ class classroom:
                 student.get_action()
             if student.living:
                 student.move_on_prediction(student.action)
-        if p1.living:
+        if p1 and p1.living:
             p1.move_on_prediction(p1.action)
 
     def reward_living(self, x, y):
@@ -473,7 +490,7 @@ class classroom:
 
                 if student.lives <= 0:
                     student.stagnation = 0
-                    student.score = 0
+                    # student.score = 0
                     # student.x = random.choice([-cellsX, 2*cellsX])
                     # student.y = random.choice([-cellsY, 2*cellsY])
                     # student.x = cellsX*2
@@ -503,8 +520,9 @@ class classroom:
             student.deaths = 0
             # student.x = cellsX//2 + randint(-5, 5)
             # student.y = cellsY//2 + randint(-5, 5)
-            student.x = randint([0, cellsX/2])
-            student.y = randint([0, cellsY/2])
+            # x_window = int(cellsX - (cellsX/2)**self.battle)
+            student.x = random.randint(0, int(cellsX * ((1 + self.battle) / (2 + self.battle))))
+            student.y = random.randint(0, int(cellsY * ((1 + self.battle) / (2 + self.battle))))
         self.resuscitate()
 
     def stagnation(self):
@@ -525,6 +543,19 @@ class classroom:
                     print(f"Winner!... {student.score} points scored")
                     return True
 
+            if gameState.sum() == 0:
+                print(f"No cloud cover...")
+                return True
+
+        if p1 and p1.x == locations[0].x and p1.y == locations[0].y:
+            print("Player found the Castle!!!")
+            return True
+
+        if p1 and p1.hp == 0:
+            p1.hp = 3
+            p1.lives = 3
+            return True
+
         return False
 
     def get_min_stag(self):
@@ -537,9 +568,9 @@ class classroom:
     def report(self):
         for i, s in enumerate(self.students):
             if s.living:
-                print(f"P{i+1} {'I'*s.lives} {s.score} | ", end='')
+                print(f"P{i + 1} {'I' * s.lives} {s.score} | ", end='')
             else:
-                print(f"   {'I'*s.lives}    {s.score} | ", end='')
+                print(f"   {'I' * s.lives}    {s.score} | ", end='')
         print()
 
 
@@ -547,22 +578,29 @@ class player:
     def __init__(self, color=None):
         if color:
             self.color = (0, 0, 255)
-            self.x = 2*cellsX//3
-            self.y = cellsY//3
+            self.x = 2 * cellsX // 3
+            self.y = cellsY // 3
         else:
             a = randint(0, 128)
-            self.a_color = tuple([a, 128, 128-a])
+            self.a_color = tuple([a, 128, 128 - a])
             # self.a_color = tuple([a, 255-a, randint(0, 255)])
             # self.b_color = tuple([128, max(self.a_color[1]*2, 255), 255-self.a_color[2]])
-            self.b_color = darkgrey
+            self.b_color = (0, grass[1]/2, 0)
             self.color = self.a_color
             self.x = cellsX // 2
             self.y = cellsY // 2
         self.team = None
         self.lives = 3
+        self.hp = 3
+        self.dmg = 1
         self.score = 0
         self.reward = 0
+        self.kills = 0
+        self.armor = 0
         self.gold = False
+        self.oof = False
+        self.rawr = False
+        self.ding = False
         self.deaths = 0
         self.stagnation = 0
         self.action = 0
@@ -573,29 +611,72 @@ class player:
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
 
-        pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+        if self.color == (0, 0, 0):
+            pygame.draw.rect(screen, black, pygame.Rect(0, 0, res, res))
+            pygame.draw.rect(screen, (165, 42, 42), pygame.Rect(res/3+1, res/2, res/3+1, res/2))
+
+            if c1.battle > 0:
+                pygame.draw.rect(screen, black, pygame.Rect(res*(cellsX-1), res*(cellsY-1), res, res))
+                pygame.draw.rect(screen, (165, 42, 42), pygame.Rect((cellsX-1)*res-1+res/3+2, res*(cellsY-1)+res/2, res/3+1, res/2))
+
+        else:
+            pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
         if self.reward < 0 and overlay:
-            pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad*.5)
+            pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad * .5)
         if self.reward > 0 and overlay:
-            pygame.draw.rect(screen, white, pygame.Rect(res * self.x + circ_rad-1, res * self.y, circ_rad*.25, circ_rad*2))
-            pygame.draw.rect(screen, white, pygame.Rect(res * self.x, res * self.y + circ_rad-1, circ_rad*2, circ_rad*0.25))
-        if self.lives <= 0:
+            pygame.draw.rect(screen, white,
+                             pygame.Rect(res * self.x + circ_rad - 1, res * self.y, circ_rad * .25, circ_rad * 2))
+            pygame.draw.rect(screen, white,
+                             pygame.Rect(res * self.x, res * self.y + circ_rad - 1, circ_rad * 2, circ_rad * 0.25))
+        if self.lives <= 0 and self.color == self.a_color:
             self.color = self.b_color
+            self.rawr = True
             self.lives = -1
         if self.gold and overlay:
-            pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(res * self.x + circ_rad//2, res * self.y-1, circ_rad, circ_rad//2))
+            pygame.draw.rect(screen, (255, 255, 0),
+                             pygame.Rect(res * self.x + circ_rad // 2, res * self.y - 1, circ_rad, circ_rad // 2))
 
     def draw_scoreboard(self):
         font = pygame.font.Font('freesansbold.ttf', 22)
-        line = "Player1 "
+        line = f"Level {c1.battle}"
         text = font.render(line, True, p1.color, grey)
         text.set_alpha(200)
         textRect = text.get_rect()
-        textRect.x += windowSize[0]*5/6
+        textRect.x += windowSize[0] * 2 / 3
         textRect.y += res
         screen.blit(text, textRect)
 
+        line = f"Lives {'l' * self.hp}"
+        text = font.render(line, True, p1.color, grey)
+        text.set_alpha(200)
+        textRect = text.get_rect()
+        textRect.x += windowSize[0] * 2 / 3
+        textRect.y += res * 2
+        screen.blit(text, textRect)
+
+        font = pygame.font.Font('freesansbold.ttf', 12)
+        percent = round((float(self.dmg)-1)*100)
+        if percent > 0:
+            # print(f"DMG {percent} with damage {self.dmg}")
+            line = f"+{percent}% DMG"
+            text = font.render(line, True, p1.color, grey)
+            text.set_alpha(200)
+            textRect = text.get_rect()
+            textRect.x += windowSize[0] * 2 / 3
+            textRect.y += res * 3
+            screen.blit(text, textRect)
+        if self.armor > 0:
+            line = f"+{self.armor} Armor"
+            text = font.render(line, True, p1.color, grey)
+            text.set_alpha(200)
+            textRect = text.get_rect()
+            textRect.x += windowSize[0] * 2 / 3
+            textRect.y += res * 3 + res//2
+            screen.blit(text, textRect)
+
     def get_observable(self, state):
+        if p1:
+            state[p1.x, p1.y] = 1
         arr = [-1] * c1.n
         map = []
         i = 0
@@ -632,7 +713,7 @@ class player:
             elif not p1:
                 self.y = cellsY - 1
         if prediction == 2:  # DOWN
-            if self.y <= cellsY - wall:
+            if self.y <= cellsY - wall - 2:
                 self.y += 1
             elif not p1:
                 self.y = 0
@@ -642,20 +723,26 @@ class player:
             elif not p1:
                 self.x = cellsX - 1
         if prediction == 4:  # RIGHT
-            if self.x <= cellsX - wall:
+            if self.x <= cellsX - wall - 2:
                 self.x += 1
             elif not p1:
                 self.x = 0
 
 
+# Define landscape
 locations = []
+castle = player()
+castle.color = (0, 0, 0)
+castle.x = 0
+castle.y = 0
+locations.append(castle)
 c1 = classroom()
+p1 = None
 p1 = player()
-p1.x = cellsX-1
-p1.y = cellsY-1
+p1.x = cellsX - 1
+p1.y = cellsY - 1
 p1.human = True
 p1.color = (0, 0, 128)
-
 
 
 ### Welcome screen and game controls ###
@@ -701,7 +788,6 @@ def waitForTheUser():
             # Go to the next screen when any key is pressed
             elif event.type == pygame.KEYDOWN:
                 return
-
 
 
 # # Fonts:
@@ -771,8 +857,9 @@ def showControls():
 # showControls()
 oof_sound = path + 'music' + os.sep + 'OOF.wav'
 ding_sound = path + 'music' + os.sep + 'ding.wav'
+rawr_sound = path + 'music' + os.sep + 'RAWR.wav'
 pygame.mixer.init()
-pygame.mixer.music.set_volume(0.05)
+pygame.mixer.music.set_volume(1)
 
 
 ### Game execution ###
@@ -786,16 +873,22 @@ def currentCell():
 
 def drawCell(x, y):
     ''' Draw cell with coordinates (x, y) in the screen '''
+    turf = (100-min(math.sqrt(x**max(10-c1.battle, 0)+y**max(10-c1.battle, 0)), 100), 100, 0)
+
+    pygame.draw.polygon(screen, turf, poly[x, y], 0)
     if gameState[x, y] == 0:
-        pygame.draw.polygon(screen, grey, poly[x, y], 0)
-        pygame.draw.polygon(screen, grey, poly[x, y], 1)
+        # turf = (100-min(10*x, 100), max(10*y, 100)-100, 0)
+
+        # pygame.draw.polygon(screen, grey, poly[x, y], 1)
         if len(states) > 0:
-            if states[-1][x, y] == 1:
-                pygame.draw.polygon(screen, red, poly[x, y], 0)
-                pygame.draw.polygon(screen, grey, poly[x, y], 1)
+            if states[-1][x, y] == 1:  # Cell just turned off, using lag
+                cloudEdge = (turf[0], turf[1]-2, 0)
+                pygame.draw.polygon(screen, cloudEdge, poly[x, y], 0)
+                # pygame.draw.polygon(screen, grey, poly[x, y], 1)
     else:
-        pygame.draw.polygon(screen, darkgrey, poly[x, y], 0)
-        pygame.draw.polygon(screen, grey, poly[x, y], 1)
+        cloud = (turf[0], turf[1]-3, 0)
+        pygame.draw.polygon(screen, cloud, poly[x, y], 0)
+        # pygame.draw.polygon(screen, grey, poly[x, y], 1)
 
 
 def updateScreen():
@@ -811,6 +904,124 @@ def updateScreen():
     if p1:
         p1.draw_scoreboard()
     pygame.display.update()
+
+    if c1.transition:
+        pass
+        # p1.x = 0
+        # p1.y = 0
+        # for x in range(cellsX-1):
+        #
+        #     p1.x += 1
+        #     # print(f"For {cellsX}, {p1.x}")
+        #     p1.y += int(cellsY/cellsX)
+        #     c1.draw_living()
+        #     pygame.display.update()
+        #     sleep(.1)
+        # c1.transition = False
+
+    sound_message()
+
+
+def sound_message():
+    global delay
+    if p1.oof:
+        pygame.mixer.music.load(oof_sound)
+        pygame.mixer.music.play()
+        p1.oof = False
+    for student in c1.students:
+        if student.rawr:
+            pygame.mixer.music.load(rawr_sound)
+            pygame.mixer.music.play()
+            student.rawr = False
+    if p1.hp <= 0:
+        print("You Died!")
+        c1.students = []
+        c1.students.append(player())
+        c1.students.append(player())
+        # Sound.mute()
+        messagebox.showerror('You Died!', f'Score {c1.battle + p1.kills}')
+        c1.battle = 0
+        delay = default_delay
+        focusWindow()
+        p1.hp = 3
+        p1.living = True
+        p1.x = cellsX - 1
+        p1.y = cellsY - 1
+    if p1.ding or c1.count_living() == 0:
+        c1.battle += 1
+        c1.transition = True
+
+        if c1.battle % 2:
+            delay = delay*.95
+
+        pygame.mixer.music.load(ding_sound)
+        pygame.mixer.music.play()
+
+        p1.ding = False
+        p1.x = cellsX - 1
+        p1.y = cellsY - 1
+
+        # message_window = tkinter.Toplevel(tkRoot)
+        # message_window.positionfrom()
+        # message_window.title("Level Passed")
+        # label = tkinter.Label(message_window, text='Chose Upgrade')
+        # dmg_btn = tkinter.Button(message_window, text = "+1 DMG")
+        # dmg_btn.pack(side=tkinter.LEFT)
+        # arm_btn = tkinter.Button(message_window, text="+1 Armor")
+        # arm_btn.pack(side=tkinter.LEFT)
+        # hp_btn = tkinter.Button(message_window, text="+1 Max HP")
+        # hp_btn.pack(side=tkinter.RIGHT)
+        # label.pack(side=tkinter.TOP)
+        # tkRoot.mainloop()
+        if c1.count_living() == 0:
+            messagebox.showinfo('Level Passed', f'Victory!\nWon in {c1.battle} rounds')
+            c1.battle = 0
+            p1.armor = 0
+            p1.kills = 0
+            p1.dmg = 1
+            reset_clouds()
+            c1.init_students()
+        else:
+            upgrade = random.choice(['+25% DMG', '+ Armor', 'Max HP'])
+            messagebox.showinfo('Level Passed', upgrade)
+            if '+25% DMG' == upgrade:
+                p1.dmg += .25
+            elif '+ Armor' == upgrade:
+                p1.armor += 1
+            elif 'Max HP' == upgrade:
+                p1.hp = min(max_hp, p1.hp+1)
+            print(f"Upgrade: {upgrade}, dmg {p1.dmg}")
+            upgrade = None
+
+        focusWindow()
+
+        for x in range(cellsX//2):
+            for y in range(cellsY//2):
+                gameState[x, y] = random.choice([0, 1])
+
+
+
+        p = player()
+        p.x = randint(0, cellsX // (1 + c1.battle))
+        p.y = randint(0, cellsY // (1 + c1.battle))
+
+        if c1.battle >= 4:
+            p.armor = c1.battle//2
+            p.hp = p.hp + c1.battle//2
+            p.lives = p.lives + c1.battle//2
+            p.dmg = c1.battle//2
+            p.color = (0, grass[1]/c1.battle, 0)
+
+        c1.students.append(p)
+
+        # new_castle = player()
+        # castle.color = (0, 0, 0)
+        # castle.x = 0
+        # castle.y = cellsY-1
+        # locations.insert(0, castle)
+        # locations[1].x = cellsX-1
+        # p1.x = locations[1].x
+        # p1.y = locations[1].y
 
 
 def liveNeighbors(x, y):
@@ -868,6 +1079,30 @@ def nextGeneration():
             if newGameState[x, y]:
                 c1.reward_living(x, y)
 
+    if p1:
+        for student in c1.students:
+            if student.x == p1.x and student.y == p1.y:
+                # student.lives -= p1.dmg
+                student.hp -= p1.dmg
+                student.lives -= p1.dmg
+
+                if student.hp > 0:
+                    if p1.armor <= 1:
+                        p1.hp -= student.dmg
+                    if student.color == student.b_color and p1.armor <= 0:
+                        p1.hp -= student.dmg
+                        p1.oof = True
+                    if p1.hp <= 0:
+                        student.rawr = True
+                        p1.living = False
+                if student.hp <= 0 and student.living:
+                    student.rawr = True
+                    student.living = False
+                    p1.kills += 1
+        if p1.x == locations[0].x and p1.y == locations[0].y:
+            p1.ding = True
+            p1.hp = min(p1.hp+1, max_hp)
+
     updateGameState(newGameState)
     updateScreen()
 
@@ -906,7 +1141,19 @@ updateScreen()
 
 def handle_user_input():
     global mouseClicked, cellValue, gamePaused, lastTime, gameState, wraparound, stepByStep, delay, states, delayInt
+
+    pressed = pygame.key.get_pressed()
+    if pressed[pygame.K_UP]:
+        p1.action = 1
+    if pressed[pygame.K_DOWN]:
+        p1.action = 2
+    if pressed[pygame.K_LEFT]:
+        p1.action = 3
+    if pressed[pygame.K_RIGHT]:
+        p1.action = 4
+
     for event in pygame.event.get():
+
         # Close window when close button is pressed
         if event.type == pygame.QUIT:
             sys.exit()
@@ -1030,23 +1277,21 @@ def handle_user_input():
                 showControls()
                 updateScreen()
 
-            elif p1 and event.key == pygame.K_UP:
+            elif p1 and (pressed[pygame.K_UP]):
                 p1.action = 1
 
-            elif p1 and event.key == pygame.K_DOWN:
+            elif p1 and (pressed[pygame.K_DOWN]):
                 p1.action = 2
 
-            elif p1 and event.key == pygame.K_LEFT:
+            elif p1 and (pressed[pygame.K_LEFT]):
                 p1.action = 3
 
-            elif p1 and event.key == pygame.K_RIGHT:
+            elif p1 and (pressed[pygame.K_RIGHT]):
                 p1.action = 4
 
     for student in c1.students:
         if student.action != 0 and student.lives >= 0:
             student.living = True
-
-
 
     # Handle mouse dragging
     if mouseClicked:
@@ -1056,16 +1301,18 @@ def handle_user_input():
         pygame.display.update()
 
 
-def restart_game():
+def reset_clouds():
     global gamePaused, safety_radius
-    newGameState = numpy.random.choice \
-        (a=[0, 1], size=(cellsX, cellsY))
-    safety_radius *= .95
-    for x in range(int(cellsX//2-cellsX*safety_radius/2), int(cellsX//2+cellsX*safety_radius/2)):
-        for y in range(int(cellsY//2-cellsY*safety_radius/2), int(cellsY//2+cellsY*safety_radius/2)):
+    newGameState = numpy.random.choice(a=[0, 1], size=(cellsX, cellsY))
+    # safety_radius *= .95
+    for x in range(int(cellsX // 2), cellsX-1):
+        for y in range(int(cellsY // 2), cellsY-1):
             newGameState[x, y] = 0
-    c1.trials += 1\
 
+
+def restart_game():
+    reset_clouds()
+    c1.trials += 1
     c1.resuscitate()
     updateGameState(newGameState)
     gamePaused = False
@@ -1092,12 +1339,9 @@ while True:
             if len(states) > 1:
                 c1.update_model()
                 c1.rebase_students()
-
             lastTime = time()
 
-    # c1.report()
-    if len(states) >= 499 or c1.stagnation():
-
+    if not p1 and (len(states) >= 499 or c1.stagnation()):
         c1.report_best()
         model_json = c1.model.to_json()
         with open('gol.json', 'w') as json_file:
@@ -1107,5 +1351,3 @@ while True:
         c1.reset_students()
         states.clear()
         eps *= eps_decay_factor
-
-
