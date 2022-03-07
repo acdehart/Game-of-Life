@@ -128,7 +128,7 @@ gameState = numpy.zeros((cellsX, cellsY), int)
 # Values to serialize:
 stepByStep = False
 wraparound = True
-overlay = False
+# overlay = False
 delayInt = 1  # Speed
 max_level = 25
 
@@ -531,7 +531,15 @@ class classroom:
         min_stagnation = self.get_min_stag()
         best = self.report_best(verbose=False)
 
+        global gameState
+
         if not p1:
+            if len(states) % 30 == 1:
+                gameState = numpy.random.choice(a=[0, 1], size=(cellsX, cellsY))
+                for x in range(int(cellsX // 2), cellsX - 1):
+                    for y in range(int(cellsY // 2), cellsY - 1):
+                        gameState[x, y] = 0
+
             if self.count_living() <= 1:
                 print(f"P{best['winner']} Last Alive with {best['max_score']}")
                 return True
@@ -547,6 +555,10 @@ class classroom:
 
             if gameState.sum() == 0:
                 print(f"No cloud cover...")
+                gameState = numpy.random.choice(a=[0, 1], size=(cellsX, cellsY))
+                for x in range(int(cellsX // 2), cellsX - 1):
+                    for y in range(int(cellsY // 2), cellsY - 1):
+                        gameState[x, y] = 0
                 return True
 
         if p1 and p1.x == locations[0].x and p1.y == locations[0].y:
@@ -748,11 +760,12 @@ castle.y = 0
 locations.append(castle)
 c1 = classroom()
 p1 = None
-p1 = player()
-p1.x = cellsX - 1
-p1.y = cellsY - 1
-p1.human = True
-p1.color = (0, 0, 128)
+overlay = True
+# p1 = player()
+# p1.x = cellsX - 1
+# p1.y = cellsY - 1
+# p1.human = True
+# p1.color = (0, 0, 128)
 
 
 ### Welcome screen and game controls ###
@@ -936,16 +949,17 @@ def updateScreen():
 
 def sound_message():
     global delay
-    if p1.oof or c1.battle >= max_level:
+    if p1 and p1.oof or c1.battle >= max_level:
         pygame.mixer.music.load(oof_sound)
         pygame.mixer.music.play()
-        p1.oof = False
+        if p1:
+            p1.oof = False
     for student in c1.students:
         if student.rawr:
             pygame.mixer.music.load(rawr_sound)
             pygame.mixer.music.play()
             student.rawr = False
-    if p1.hp <= 0:
+    if (p1 and p1.hp <= 0):
         print("You Died!")
         c1.students = []
         c1.students.append(player())
@@ -977,7 +991,7 @@ def sound_message():
         p1.x = cellsX -1
         p1.y = cellsY -1
 
-    if p1.ding or c1.count_living() == 0:
+    if (p1 and p1.ding) or c1.count_living() == 0:
         c1.battle += 1
         c1.transition = True
 
@@ -1174,14 +1188,15 @@ def handle_user_input():
     global mouseClicked, cellValue, gamePaused, lastTime, gameState, wraparound, stepByStep, delay, states, delayInt
 
     pressed = pygame.key.get_pressed()
-    if pressed[pygame.K_UP]:
-        p1.action = 1
-    if pressed[pygame.K_DOWN]:
-        p1.action = 2
-    if pressed[pygame.K_LEFT]:
-        p1.action = 3
-    if pressed[pygame.K_RIGHT]:
-        p1.action = 4
+    if p1:
+        if pressed[pygame.K_UP]:
+            p1.action = 1
+        if pressed[pygame.K_DOWN]:
+            p1.action = 2
+        if pressed[pygame.K_LEFT]:
+            p1.action = 3
+        if pressed[pygame.K_RIGHT]:
+            p1.action = 4
 
     for event in pygame.event.get():
 
@@ -1335,7 +1350,6 @@ def handle_user_input():
 def reset_clouds():
     global gamePaused, safety_radius
     newGameState = numpy.random.choice(a=[0, 1], size=(cellsX, cellsY))
-    # safety_radius *= .95
     for x in range(int(cellsX // 2), cellsX-1):
         for y in range(int(cellsY // 2), cellsY-1):
             newGameState[x, y] = 0
@@ -1357,8 +1371,9 @@ eps_decay_factor = 0.999
 learning_rate = 0.8
 choices = [0, 1, 2, 3, 4]
 
-messagebox.showwarning('Goblins & Kittens', f"Get to the safehouse!\nAvoid Goblins until you're ready..")
-focusWindow()
+if p1:
+    messagebox.showwarning('Goblins & Kittens', f"Get to the safehouse!\nAvoid Goblins until you're ready..")
+    focusWindow()
 
 while True:
     # Event handling:
@@ -1374,6 +1389,7 @@ while True:
                 c1.update_model()
                 c1.rebase_students()
                 if len(states) % 60 == 1 and c1.count_living() < 20:
+                    reset_clouds()
                     pygame.mixer.music.load(rawr_sound)
                     pygame.mixer.music.play()
                     p = player()

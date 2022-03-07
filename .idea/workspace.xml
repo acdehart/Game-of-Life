@@ -4,6 +4,7 @@
     <list default="true" id="fb4773df-b303-4bd6-8502-a10b1e036e02" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GameOfLife.py" beforeDir="false" afterPath="$PROJECT_DIR$/GameOfLife.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gol.h5" beforeDir="false" afterPath="$PROJECT_DIR$/gol.h5" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -90,7 +91,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/GameOfLife.py</url>
-          <line>931</line>
+          <line>944</line>
           <option name="timeStamp" value="3" />
         </line-breakpoint>
       </breakpoints>
