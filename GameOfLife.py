@@ -67,7 +67,7 @@ colors['cyan'] = 0, 128, 255
 # Window creation:
 pygame.init()  # Init all imported pygame modules
 iconPath = path + 'icon.png'
-windowTitle = 'Game of Life'
+windowTitle = 'Goblins & Kittens'
 pygame.display.set_caption(windowTitle)
 if os.path.exists(iconPath):
     icon = pygame.image.load(iconPath)
@@ -130,7 +130,7 @@ stepByStep = False
 wraparound = True
 overlay = False
 delayInt = 1  # Speed
-max_level = 45
+max_level = 25
 
 # Other values:
 default_delay = 0.1
@@ -632,6 +632,7 @@ class player:
                              pygame.Rect(res * self.x, res * self.y + circ_rad - 1, circ_rad * 2, circ_rad * 0.25))
         if self.lives <= 0 and self.color == self.a_color:
             self.color = self.b_color
+            self.dmg = 2
             self.rawr = True
             self.lives = -1
         if self.gold and overlay:
@@ -639,21 +640,23 @@ class player:
                              pygame.Rect(res * self.x + circ_rad // 2, res * self.y - 1, circ_rad, circ_rad // 2))
 
     def draw_scoreboard(self):
+        global brown_radius
+        turf = (100 - min(brown_radius, 100), 100, 0)
         font = pygame.font.Font('freesansbold.ttf', 22)
         line = f"Level {c1.battle}"
-        text = font.render(line, True, p1.color, grey)
+        text = font.render(line, True, p1.color, turf)
         text.set_alpha(200)
         textRect = text.get_rect()
-        textRect.x += windowSize[0] * 2 / 3
-        textRect.y += res
+        textRect.x += windowSize[0] * 3 // 4 - 12
+        textRect.y += 0
         screen.blit(text, textRect)
 
         line = f"Lives {'l' * self.hp}"
-        text = font.render(line, True, p1.color, grey)
+        text = font.render(line, True, p1.color, turf)
         text.set_alpha(200)
         textRect = text.get_rect()
-        textRect.x += windowSize[0] * 2 / 3
-        textRect.y += res * 2
+        textRect.x += windowSize[0] * 3 // 4 - 12
+        textRect.y += res
         screen.blit(text, textRect)
 
         font = pygame.font.Font('freesansbold.ttf', 12)
@@ -661,19 +664,24 @@ class player:
         if percent > 0:
             # print(f"DMG {percent} with damage {self.dmg}")
             line = f"+{percent}% DMG"
-            text = font.render(line, True, p1.color, grey)
+            text = font.render(line, True, p1.color, turf)
             text.set_alpha(200)
             textRect = text.get_rect()
-            textRect.x += windowSize[0] * 2 / 3
-            textRect.y += res * 3
+            textRect.x += windowSize[0] * 3 // 4 - 12
+            textRect.y += res*2 + res*2//3
             screen.blit(text, textRect)
         if self.armor > 0:
-            line = f"+{self.armor} Armor"
-            text = font.render(line, True, p1.color, grey)
+            if self.armor == 1:
+                line = f"Light Armor"
+            elif self.armor >= 2:
+                line = f"Heavy Armor"
+                self.armor = 2
+
+            text = font.render(line, True, p1.color, turf)
             text.set_alpha(200)
             textRect = text.get_rect()
-            textRect.x += windowSize[0] * 2 / 3
-            textRect.y += res * 3 + res//2
+            textRect.x += windowSize[0]* 3 // 4 - 12
+            textRect.y += res * 2
             screen.blit(text, textRect)
 
     def get_observable(self, state):
@@ -712,22 +720,22 @@ class player:
         if prediction == 1:  # UP
             if self.y > wall:
                 self.y -= 1
-            elif not p1:
+            elif self != p1:
                 self.y = cellsY - 1
         if prediction == 2:  # DOWN
             if self.y <= cellsY - wall - 2:
                 self.y += 1
-            elif not p1:
+            elif self != p1:
                 self.y = 0
         if prediction == 3:  # LEFT
             if self.x > wall:
                 self.x -= 1
-            elif not p1:
+            elif self != p1:
                 self.x = cellsX - 1
         if prediction == 4:  # RIGHT
             if self.x <= cellsX - wall - 2:
                 self.x += 1
-            elif not p1:
+            elif self != p1:
                 self.x = 0
 
 
@@ -948,11 +956,13 @@ def sound_message():
         delay = default_delay
         focusWindow()
         p1.hp = 3
+        p1.dmg = 1
+        p1.armor = 0
         p1.living = True
         p1.x = cellsX - 1
         p1.y = cellsY - 1
 
-    if c1.battle >= max_level:
+    elif c1.battle >= max_level:
         c1.students = []
         c1.students.append(player())
         c1.students.append(player())
@@ -961,6 +971,8 @@ def sound_message():
         delay = default_delay
         focusWindow()
         p1.hp = 3
+        p1.dmg = 1
+        p1.armor = 0
         p1.living = True
         p1.x = cellsX -1
         p1.y = cellsY -1
@@ -999,16 +1011,19 @@ def sound_message():
             p1.dmg = 1
             reset_clouds()
             c1.init_students()
-        elif c1.battle < max_level:
-            upgrade = random.choice(['+25% DMG', '+ Armor', 'Max HP'])
+        elif c1.battle < max_level and p1.hp > 0:
+            upgrade = random.choice(['Found Weapon!', 'Found Armor!', 'Recover Max HP', 'More and more Goblins\nterrorize the land...'])
             messagebox.showinfo('Level Passed', upgrade)
-            if '+25% DMG' == upgrade:
-                p1.dmg += .25
-            elif '+ Armor' == upgrade:
+            if 'Found Weapon!' == upgrade:
+                p1.dmg = min(p1.dmg + .25, 2)
+            elif 'Found Armor!' == upgrade:
                 p1.armor += 1
-            elif 'Max HP' == upgrade:
-                p1.hp = min(max_hp, p1.hp+1)
-            print(f"Upgrade: {upgrade}, dmg {p1.dmg}")
+            elif 'Recover Max HP' == upgrade:
+                p1.hp = max_hp
+            elif 'More and more' in upgrade:
+                c1.students.append(player())
+
+            print(f"Upgrade: {upgrade}, arm {p1.armor}")
             upgrade = None
 
         focusWindow()
@@ -1017,20 +1032,19 @@ def sound_message():
             for y in range(cellsY//2):
                 gameState[x, y] = random.choice([0, 1])
 
-
-
         p = player()
         p.x = randint(0, cellsX // (1 + c1.battle))
         p.y = randint(0, cellsY // (1 + c1.battle))
 
         if c1.battle >= 4:
-            p.armor = c1.battle//2
-            p.hp = p.hp + c1.battle//2
-            p.lives = p.lives + c1.battle//2
-            p.dmg = c1.battle//2
+            p.armor = c1.battle
+            p.hp = p.hp + c1.battle * 2
+            p.lives = p.lives + c1.battle*2
+            p.dmg = c1.battle*2
             p.color = (0, grass[1]/c1.battle, 0)
 
-        c1.students.append(p)
+        if c1.count_living() < 16:
+            c1.students.append(p)
 
         # new_castle = player()
         # castle.color = (0, 0, 0)
@@ -1105,13 +1119,12 @@ def nextGeneration():
                 student.lives -= p1.dmg
 
                 if student.hp > 0:
-                    if p1.armor <= 1:
-                        p1.hp -= student.dmg
-                    if student.color == student.b_color and p1.armor <= 0:
-                        p1.hp -= student.dmg
-                        p1.oof = True
+                    p1.hp -= max(student.dmg-p1.armor, 0)
+                    # if student.color == student.b_color:
+                        # p1.hp -= round(student.dmg)
+                    p1.oof = True
                     if p1.hp <= 0:
-                        student.rawr = True
+                        # student.rawr = True
                         p1.living = False
                 if student.hp <= 0 and student.living:
                     student.rawr = True
@@ -1119,7 +1132,7 @@ def nextGeneration():
                     p1.kills += 1
         if p1.x == locations[0].x and p1.y == locations[0].y:
             p1.ding = True
-            p1.hp = min(p1.hp+1, max_hp)
+            # p1.hp = min(p1.hp+1, max_hp)
 
     updateGameState(newGameState)
     updateScreen()
@@ -1344,6 +1357,9 @@ eps_decay_factor = 0.999
 learning_rate = 0.8
 choices = [0, 1, 2, 3, 4]
 
+messagebox.showwarning('Goblins & Kittens', f"Get to the safehouse!\nAvoid Goblins until you're ready..")
+focusWindow()
+
 while True:
     # Event handling:
     if isTryingToQuit():
@@ -1357,6 +1373,13 @@ while True:
             if len(states) > 1:
                 c1.update_model()
                 c1.rebase_students()
+                if len(states) % 60 == 1 and c1.count_living() < 20:
+                    pygame.mixer.music.load(rawr_sound)
+                    pygame.mixer.music.play()
+                    p = player()
+                    p.x = random.choice([0, 1])
+                    p.y = random.choice([0, 1])
+                    c1.students.append(p)
             lastTime = time()
 
     if not p1 and (len(states) >= 499 or c1.stagnation()):
