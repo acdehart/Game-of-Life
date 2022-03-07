@@ -51,6 +51,7 @@ darkgrey = 200, 200, 200
 black = 0, 0, 0
 red = 128, 0, 0
 grass = 0, 100, 0
+brown_radius = 0
 
 colors = {}
 colors['blue'] = 0, 0, 128
@@ -129,6 +130,7 @@ stepByStep = False
 wraparound = True
 overlay = False
 delayInt = 1  # Speed
+max_level = 45
 
 # Other values:
 default_delay = 0.1
@@ -873,7 +875,9 @@ def currentCell():
 
 def drawCell(x, y):
     ''' Draw cell with coordinates (x, y) in the screen '''
-    turf = (100-min(math.sqrt(x**max(10-c1.battle, 0)+y**max(10-c1.battle, 0)), 100), 100, 0)
+    global brown_radius
+    brown_radius = math.sqrt(x**max(10-c1.battle, 0)+y**max(10-c1.battle, 0))
+    turf = (100-min(brown_radius, 100), 100, 0)
 
     pygame.draw.polygon(screen, turf, poly[x, y], 0)
     if gameState[x, y] == 0:
@@ -924,7 +928,7 @@ def updateScreen():
 
 def sound_message():
     global delay
-    if p1.oof:
+    if p1.oof or c1.battle >= max_level:
         pygame.mixer.music.load(oof_sound)
         pygame.mixer.music.play()
         p1.oof = False
@@ -947,6 +951,20 @@ def sound_message():
         p1.living = True
         p1.x = cellsX - 1
         p1.y = cellsY - 1
+
+    if c1.battle >= max_level:
+        c1.students = []
+        c1.students.append(player())
+        c1.students.append(player())
+        messagebox.showerror('Game Over', f'Goblins took over the land...\nScore {c1.battle + p1.kills}')
+        c1.battle = 0
+        delay = default_delay
+        focusWindow()
+        p1.hp = 3
+        p1.living = True
+        p1.x = cellsX -1
+        p1.y = cellsY -1
+
     if p1.ding or c1.count_living() == 0:
         c1.battle += 1
         c1.transition = True
@@ -981,7 +999,7 @@ def sound_message():
             p1.dmg = 1
             reset_clouds()
             c1.init_students()
-        else:
+        elif c1.battle < max_level:
             upgrade = random.choice(['+25% DMG', '+ Armor', 'Max HP'])
             messagebox.showinfo('Level Passed', upgrade)
             if '+25% DMG' == upgrade:
