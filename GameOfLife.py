@@ -427,7 +427,7 @@ class classroom:
             student.lives = 3
             if student.color == student.a_color:
                 still_alive = True
-        if not still_alive or max_score >= 30 or (p1 and p1.x == locations[0].x and p1.y == locations[0].y):
+        if not still_alive or max_score >= 30 or (p1 and round(p1.x) == locations[0].x and round(p1.y) == locations[0].y):
             if max_score >= 30:
                 self.ticker.append(len(self.observations))
             self.round = 0
@@ -465,11 +465,14 @@ class classroom:
                 student.stagnation = 1000
 
     def act(self):
+        global flipper
         for i, student in enumerate(self.students):
             if student.living:
                 student.get_action()
             if student.living:
-                student.move_on_prediction(student.action)
+
+                if not student.human:
+                    student.move_on_prediction(student.action)
         if p1 and p1.living:
             p1.move_on_prediction(p1.action)
 
@@ -561,7 +564,7 @@ class classroom:
                         gameState[x, y] = 0
                 return True
 
-        if p1 and p1.x == locations[0].x and p1.y == locations[0].y:
+        if p1 and round(p1.x) == locations[0].x and round(p1.y) == locations[0].y:
             print("Player found the Castle!!!")
             return True
 
@@ -611,7 +614,9 @@ class player:
         self.reward = 0
         self.kills = 0
         self.armor = 0
+        self.speed_mod = 1
         self.gold = False
+        self.sneak = False
         self.oof = False
         self.rawr = False
         self.ding = False
@@ -645,6 +650,7 @@ class player:
         if self.lives <= 0 and self.color == self.a_color:
             self.color = self.b_color
             self.dmg = 2
+            self.speed_mod = 2
             self.rawr = True
             self.lives = -1
         if self.gold and overlay:
@@ -698,13 +704,13 @@ class player:
 
     def get_observable(self, state):
         if p1:
-            state[p1.x, p1.y] = 1
+            state[round(p1.x), round(p1.y)] = 1
         arr = [-1] * c1.n
         map = []
         i = 0
-        for row in range(self.y - c1.r, self.y + c1.r + 1):
+        for row in range(round(self.y) - c1.r, round(self.y) + c1.r + 1):
             temp = []
-            for col in range(self.x - c1.r, self.x + c1.r + 1):
+            for col in range(round(self.x) - c1.r, round(self.x) + c1.r + 1):
                 # try:
                 if state[col % cellsX, row % cellsY]:
                     arr[i] = state[col % cellsX, row % cellsY]
@@ -731,22 +737,22 @@ class player:
         wall = 0
         if prediction == 1:  # UP
             if self.y > wall:
-                self.y -= 1
+                self.y -= 1/self.speed_mod
             elif self != p1:
                 self.y = cellsY - 1
         if prediction == 2:  # DOWN
             if self.y <= cellsY - wall - 2:
-                self.y += 1
+                self.y += 1/self.speed_mod
             elif self != p1:
                 self.y = 0
         if prediction == 3:  # LEFT
             if self.x > wall:
-                self.x -= 1
+                self.x -= 1/self.speed_mod
             elif self != p1:
                 self.x = cellsX - 1
         if prediction == 4:  # RIGHT
             if self.x <= cellsX - wall - 2:
-                self.x += 1
+                self.x += 1/self.speed_mod
             elif self != p1:
                 self.x = 0
 
@@ -760,12 +766,12 @@ castle.y = 0
 locations.append(castle)
 c1 = classroom()
 p1 = None
-overlay = True
-# p1 = player()
-# p1.x = cellsX - 1
-# p1.y = cellsY - 1
-# p1.human = True
-# p1.color = (0, 0, 128)
+overlay = False
+p1 = player()
+p1.x = cellsX - 1
+p1.y = cellsY - 1
+p1.human = True
+p1.color = (0, 0, 128)
 
 
 ### Welcome screen and game controls ###
@@ -881,6 +887,7 @@ def showControls():
 oof_sound = path + 'music' + os.sep + 'OOF.wav'
 ding_sound = path + 'music' + os.sep + 'ding.wav'
 rawr_sound = path + 'music' + os.sep + 'RAWR.wav'
+flipper = False
 pygame.mixer.init()
 pygame.mixer.music.set_volume(1)
 
@@ -1127,7 +1134,7 @@ def nextGeneration():
 
     if p1:
         for student in c1.students:
-            if student.x == p1.x and student.y == p1.y:
+            if round(student.x) == round(p1.x) and round(student.y) == round(p1.y):
                 # student.lives -= p1.dmg
                 student.hp -= p1.dmg
                 student.lives -= p1.dmg
@@ -1144,7 +1151,7 @@ def nextGeneration():
                     student.rawr = True
                     student.living = False
                     p1.kills += 1
-        if p1.x == locations[0].x and p1.y == locations[0].y:
+        if round(p1.x) == locations[0].x and round(p1.y) == locations[0].y:
             p1.ding = True
             # p1.hp = min(p1.hp+1, max_hp)
 
@@ -1335,6 +1342,15 @@ def handle_user_input():
             elif p1 and (pressed[pygame.K_RIGHT]):
                 p1.action = 4
 
+            if event.key == pygame.K_e:
+                p1.sneak = True
+                p1.speed_mod = 2
+                p1.color = (0, 0, 95)
+            else:
+                p1.sneak = False
+                p1.speed_mod = 1
+                p1.color = (0, 0, 128)
+
     for student in c1.students:
         if student.action != 0 and student.lives >= 0:
             student.living = True
@@ -1395,6 +1411,7 @@ while True:
                     p = player()
                     p.x = random.choice([0, 1])
                     p.y = random.choice([0, 1])
+                    p.speed_mod = 2
                     c1.students.append(p)
             lastTime = time()
 
