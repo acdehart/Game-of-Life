@@ -256,8 +256,9 @@ def check_if_future_safe(choice, future):
 
 class classroom:
     def __init__(self):
+        self.moving_sprites = pygame.sprite.Group()
+        self.students = []
         self.init_students()
-
         self.reporter = player()
         self.ticker = []
         self.ticker_norm = None
@@ -299,12 +300,15 @@ class classroom:
         self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
     def init_students(self):
+        for s in self.students:
+            s.kill()
         self.students = []
         for _ in range(players):
             p = player()
             p.x = randint(0, cellsX // 2)
             p.y = randint(0, cellsY // 2)
             self.students.append(p)
+            self.moving_sprites.add(p)
 
     def report_best(self, verbose=True):
         max_score = 0
@@ -400,12 +404,18 @@ class classroom:
             for student in self.students:
                 if student.gold:
                     student.drawPlayer()
+
         if p1:
             for student in self.students:
                 if student.hp > 0:
                     student.drawPlayer()
             if p1.living:
                 p1.drawPlayer()
+
+            self.moving_sprites.image = self.students[0].sprites[self.students[0].current_sprite]
+            self.moving_sprites.draw(screen)
+            self.moving_sprites.update()
+            pygame.display.flip()
 
     def count_living(self):
         living_count = 0
@@ -591,8 +601,9 @@ class classroom:
         print()
 
 
-class player:
+class player(pygame.sprite.Sprite):
     def __init__(self, color=None):
+        pygame.sprite.Sprite.__init__(self)
         if color:
             self.color = (0, 0, 255)
             self.x = 2 * cellsX // 3
@@ -615,6 +626,9 @@ class player:
         self.kills = 0
         self.armor = 0
         self.speed_mod = 1
+        self.current_sprite = 0
+        self.sprites = []
+        self.set_goblin()
         self.gold = False
         self.sneak = False
         self.oof = False
@@ -626,6 +640,15 @@ class player:
         self.living = True
         self.observation = None
         self.human = False
+
+    def set_goblin(self):
+        self.human = False
+        self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
@@ -640,6 +663,16 @@ class player:
 
         else:
             pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+
+            self.current_sprite += 0
+            # self.image = self.sprites[0]
+            self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
+            self.size = self.image.get_size()
+            self.image = pygame.transform.scale(self.image, (int(self.size[0]/3), int(self.size[1]/3)))
+            self.rect = self.image.get_rect()
+            self.rect.center = [int(self.x*res)+res//2, self.y*res+res//2]
+
+
         if self.reward < 0 and overlay:
             pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad * .5)
         if self.reward > 0 and overlay:
@@ -760,6 +793,7 @@ class player:
 # Define landscape
 locations = []
 castle = player()
+# castle.set_goblin()
 castle.color = (0, 0, 0)
 castle.x = 0
 castle.y = 0
@@ -768,6 +802,7 @@ c1 = classroom()
 p1 = None
 overlay = False
 p1 = player()
+# p1.set_goblin()
 p1.x = cellsX - 1
 p1.y = cellsY - 1
 p1.human = True
@@ -968,9 +1003,15 @@ def sound_message():
             student.rawr = False
     if (p1 and p1.hp <= 0):
         print("You Died!")
+        for s in c1.students:
+            s.kill()
         c1.students = []
-        c1.students.append(player())
-        c1.students.append(player())
+        p = player()
+        c1.students.append(p)
+        c1.moving_sprites.add(p)
+        q = player()
+        c1.students.append(q)
+        c1.moving_sprites.add(q)
         # Sound.mute()
         messagebox.showerror('You Died!', f'Score {c1.battle + p1.kills}')
         c1.battle = 0
@@ -984,6 +1025,8 @@ def sound_message():
         p1.y = cellsY - 1
 
     elif c1.battle >= max_level:
+        for s in students:
+            s.kill()
         c1.students = []
         c1.students.append(player())
         c1.students.append(player())
@@ -1066,6 +1109,7 @@ def sound_message():
 
         if c1.count_living() < 16:
             c1.students.append(p)
+            c1.moving_sprites.add(p)
 
         # new_castle = player()
         # castle.color = (0, 0, 0)
@@ -1147,9 +1191,11 @@ def nextGeneration():
                     if p1.hp <= 0:
                         # student.rawr = True
                         p1.living = False
+                        c1.moving_sprites.remove(p1)
                 if student.hp <= 0 and student.living:
                     student.rawr = True
                     student.living = False
+                    c1.moving_sprites.remove(student)
                     p1.kills += 1
         if round(p1.x) == locations[0].x and round(p1.y) == locations[0].y:
             p1.ding = True
@@ -1413,6 +1459,7 @@ while True:
                     p.y = random.choice([0, 1])
                     p.speed_mod = 2
                     c1.students.append(p)
+                    c1.moving_sprites.add(p)
             lastTime = time()
 
     if not p1 and (len(states) >= 499 or c1.stagnation()):
