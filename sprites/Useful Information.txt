@@ -1,0 +1,47 @@
+
+***************************************************
+Thanks for downloading Pixel Monsters Free Pack!
+Your support is greatly appreciated!
+
+-----------------------------------------------------------------------------
+I prefer to be credited as 'Matthew Ashworth', though 'Matseb2611' is also fine.
+
+This pack contains 5 different characters, each one containing a variety
+of different animated poses.
+There are 2 versions of the Armed Ghost and 2 versions of the Evil Skull.
+
+The 4-directional spritesheets of each character are useful for top down games, 
+such as 2D JRPGs.
+The side-view only spritesheets can be used either in side-view turn-based battles
+or in sidescrollers and 2D platformers.
+Though in the end it is up to you how to use them in a game.
+
+Each character has an idle pose that is useful for cycling through the frames while the 
+character is stationary to give them a more life-like feel. 
+They also have walking/moving poses, as well as a dying pose.
+The first frame of the dying pose can be used for when the character simply gets hit.
+
+Generally, although all spritesheets have been designed for specific actions, you can 
+also experiment with different frames to create new behaviours.
+Animated GIF files have been provided as a sort of an example of how some of the poses
+look when in action.
+
+------------------------------------------------------------------------------
+
+I post some alternate colour versions and other variations of these and other sprites
+on my Patreon. If you like these, I'd highly appreciate your support on there too!
+(The $5/month tier will get you access to these alt versions).
+
+https://www.patreon.com/matthewashworth
+
+Also feel free to check my website for my games, services, and free graphical stuff.
+
+http://www.astronomicgames.com/
+
+------------------------------------------------------------------------------
+
+If you have any questions regarding these sprites or other things I make, don't hesitate
+to contact me. You can find the contact info on my website.
+
+Thank you and all the best!
+
