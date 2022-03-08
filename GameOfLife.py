@@ -409,10 +409,11 @@ class classroom:
             for student in self.students:
                 if student.hp > 0:
                     student.drawPlayer()
+
             if p1.living:
                 p1.drawPlayer()
 
-            self.moving_sprites.image = self.students[0].sprites[self.students[0].current_sprite]
+
             self.moving_sprites.draw(screen)
             self.moving_sprites.update()
             pygame.display.flip()
@@ -640,15 +641,21 @@ class player(pygame.sprite.Sprite):
         self.living = True
         self.observation = None
         self.human = False
+        # self.image = None
+        # self.rect = None
 
     def set_goblin(self):
         self.human = False
         self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
         self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
+
+    def set_human(self):
+        self.human = True
+        self.sprites = []
+        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L0Ghost Sword Idle Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L1Ghost Sword Idle Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L2Ghost Sword Idle Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L3Ghost Sword Idle Pose.png"))
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
@@ -662,16 +669,20 @@ class player(pygame.sprite.Sprite):
                 pygame.draw.rect(screen, (165, 42, 42), pygame.Rect((cellsX-1)*res-1+res/3+2, res*(cellsY-1)+res/2, res/3+1, res/2))
 
         else:
-            pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+            if self.armor > 0:
+                pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
 
-            self.current_sprite += 0
-            # self.image = self.sprites[0]
-            self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
-            self.size = self.image.get_size()
-            self.image = pygame.transform.scale(self.image, (int(self.size[0]/3), int(self.size[1]/3)))
-            self.rect = self.image.get_rect()
-            self.rect.center = [int(self.x*res)+res//2, self.y*res+res//2]
+        self.current_sprite += 1
+        # self.image = self.sprites[0]
+        self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
+        self.size = self.image.get_size()
+        self.image = pygame.transform.scale(self.image, (int(self.size[0]/3), int(self.size[1]/3)))
+        self.rect = self.image.get_rect()
+        self.rect.center = [int(self.x*res)+res//2, self.y*res+res//2]
 
+
+            # self.students[0].current_sprite += 1
+            # self.moving_sprites.image = self.students[0].sprites[self.students[0].current_sprite%len(self.students[0].sprites)]
 
         if self.reward < 0 and overlay:
             pygame.draw.circle(screen, red, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad * .5)
@@ -802,11 +813,12 @@ c1 = classroom()
 p1 = None
 overlay = False
 p1 = player()
-# p1.set_goblin()
+p1.set_human()
 p1.x = cellsX - 1
 p1.y = cellsY - 1
 p1.human = True
 p1.color = (0, 0, 128)
+c1.moving_sprites.add(p1)
 
 
 ### Welcome screen and game controls ###
@@ -1012,7 +1024,6 @@ def sound_message():
         q = player()
         c1.students.append(q)
         c1.moving_sprites.add(q)
-        # Sound.mute()
         messagebox.showerror('You Died!', f'Score {c1.battle + p1.kills}')
         c1.battle = 0
         delay = default_delay
@@ -1025,11 +1036,15 @@ def sound_message():
         p1.y = cellsY - 1
 
     elif c1.battle >= max_level:
-        for s in students:
+        for s in c1.students:
             s.kill()
         c1.students = []
-        c1.students.append(player())
-        c1.students.append(player())
+        p = player()
+        c1.students.append(p)
+        c1.moving_sprites.add(p)
+        q = player()
+        c1.students.append(q)
+        c1.moving_sprites.add(q)
         messagebox.showerror('Game Over', f'Goblins took over the land...\nScore {c1.battle + p1.kills}')
         c1.battle = 0
         delay = default_delay
@@ -1085,7 +1100,10 @@ def sound_message():
             elif 'Recover Max HP' == upgrade:
                 p1.hp = max_hp
             elif 'More and more' in upgrade:
-                c1.students.append(player())
+                p = player()
+                p.drawPlayer()
+                c1.students.append(p)
+                c1.moving_sprites.add(p)
 
             print(f"Upgrade: {upgrade}, arm {p1.armor}")
             upgrade = None
@@ -1191,7 +1209,6 @@ def nextGeneration():
                     if p1.hp <= 0:
                         # student.rawr = True
                         p1.living = False
-                        c1.moving_sprites.remove(p1)
                 if student.hp <= 0 and student.living:
                     student.rawr = True
                     student.living = False
