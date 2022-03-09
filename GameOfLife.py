@@ -258,6 +258,7 @@ class classroom:
     def __init__(self):
         self.moving_sprites = pygame.sprite.Group()
         self.students = []
+        self.cats = []
         self.init_students()
         self.reporter = player()
         self.ticker = []
@@ -413,6 +414,8 @@ class classroom:
             if p1.living:
                 p1.drawPlayer()
 
+            for c in self.cats:
+                c.drawPlayer()
 
             self.moving_sprites.draw(screen)
             self.moving_sprites.update()
@@ -464,6 +467,9 @@ class classroom:
             student.reward = 0
             student.action = 0
             student.observation = None
+
+
+
         self.reporter.score = b_score
         self.round += 1
 
@@ -635,11 +641,14 @@ class player(pygame.sprite.Sprite):
         self.oof = False
         self.rawr = False
         self.ding = False
+        self.meow = False
+        self.scooped = False
         self.deaths = 0
         self.stagnation = 0
         self.action = 0
         self.living = True
         self.observation = None
+        self.cat = False
         self.human = False
         # self.image = None
         # self.rect = None
@@ -652,10 +661,17 @@ class player(pygame.sprite.Sprite):
     def set_human(self):
         self.human = True
         self.sprites = []
-        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L0Ghost Sword Idle Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L1Ghost Sword Idle Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L2Ghost Sword Idle Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Armed Ghost/L3Ghost Sword Idle Pose.png"))
+        self.sprites.append(pygame.image.load("sprites/DL1CART.png"))
+
+    def set_cat(self):
+        self.human = False
+        self.cat = True
+        self.sprites = []
+        self.sprites.append(pygame.image.load("sprites/cats/Idle0Orange.png"))
+        self.sprites.append(pygame.image.load("sprites/cats/Idle1Orange.png"))
+        self.sprites.append(pygame.image.load("sprites/cats/Idle2Orange.png"))
+        self.sprites.append(pygame.image.load("sprites/cats/Idle3Orange.png"))
+        self.sprites.append(pygame.image.load("sprites/cats/Crouch0Orange.png"))
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
@@ -669,14 +685,25 @@ class player(pygame.sprite.Sprite):
                 pygame.draw.rect(screen, (165, 42, 42), pygame.Rect((cellsX-1)*res-1+res/3+2, res*(cellsY-1)+res/2, res/3+1, res/2))
 
         else:
-            if self.armor > 0:
+            if self.armor > 0 and not self.human:
                 pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
 
         self.current_sprite += 1
         # self.image = self.sprites[0]
-        self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
+        # if self.cat:
+        #     self.current_sprite = min(self.current_sprite, len(self.sprites)-1)
+
+        if self.cat:
+            self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)-1))]
+            if self.scooped:
+                self.image = self.sprites[4]
+        else:
+            self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
         self.size = self.image.get_size()
-        self.image = pygame.transform.scale(self.image, (int(self.size[0]/3), int(self.size[1]/3)))
+        if self.cat:
+            self.image = pygame.transform.scale(self.image, (int(self.size[0]/1), int(self.size[1]/1)))
+        else:
+            self.image = pygame.transform.scale(self.image, (int(self.size[0]/2.2), int(self.size[1]/2.2)))
         self.rect = self.image.get_rect()
         self.rect.center = [int(self.x*res)+res//2, self.y*res+res//2]
 
@@ -819,6 +846,10 @@ p1.y = cellsY - 1
 p1.human = True
 p1.color = (0, 0, 128)
 c1.moving_sprites.add(p1)
+c = player()
+c.set_cat()
+c1.cats.append(c)
+c1.moving_sprites.add(c)
 
 
 ### Welcome screen and game controls ###
@@ -1034,6 +1065,10 @@ def sound_message():
         p1.living = True
         p1.x = cellsX - 1
         p1.y = cellsY - 1
+        for cat in c1.cats:
+            cat.scooped = False
+            cat.x = randint(cellsX//4, cellsX*3//4)
+            cat.y = randint(cellsY//4, cellsY*3//4)
 
     elif c1.battle >= max_level:
         for s in c1.students:
@@ -1056,9 +1091,14 @@ def sound_message():
         p1.x = cellsX -1
         p1.y = cellsY -1
 
-    if (p1 and p1.ding) or c1.count_living() == 0:
+    elif (p1 and p1.ding) or c1.count_living() == 0:
         c1.battle += 1
         c1.transition = True
+
+        for cat in c1.cats:
+            cat.scooped = False
+            cat.x = randint(cellsX//4, cellsX*3//4)
+            cat.y = randint(cellsY//4, cellsY*3//4)
 
         if c1.battle % 2:
             delay = delay*.95
@@ -1216,6 +1256,18 @@ def nextGeneration():
                     p1.kills += 1
         if round(p1.x) == locations[0].x and round(p1.y) == locations[0].y:
             p1.ding = True
+
+        for cat in c1.cats:
+            if cat.x == round(p1.x) and cat.y == round(p1.y):
+                print("Mrow")
+                # pygame.mixer.music.load(meow_sound)
+                # pygame.mixer.music.play()
+                cat.current_sprite = len(cat.sprites)
+                cat.meow = True
+                cat.scooped = p1
+            if cat.scooped:
+                cat.x = cat.scooped.x
+                cat.y = cat.scooped.y-.7
             # p1.hp = min(p1.hp+1, max_hp)
 
     updateGameState(newGameState)
