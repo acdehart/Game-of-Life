@@ -76,6 +76,7 @@ windowSize = 300, 200
 res = 20
 max_hp = 3
 players = 2
+corner = 0
 width, height = windowSize
 safety_radius = 0.7
 screen = pygame.display.set_mode(windowSize)
@@ -307,10 +308,17 @@ class classroom:
                 cart_cats += 1
         return cart_cats
 
+    def safe_cats(self):
+        house_cats = 0
+        for cat in self.cats:
+            if round(cat.x) <= locations[0].x + corner and round(cat.y) <= locations[0].y + corner:
+                house_cats += 1
+        return house_cats
+
     def cats_all_home(self):
         house_cats = 0
         for cat in self.cats:
-            if round(cat.x) == locations[0].x and round(cat.y) == locations[0].y:
+            if round(cat.x) <= locations[0].x + corner and round(cat.y) <= locations[0].y + corner:
                 house_cats += 1
         if house_cats == len(self.cats):
             return True
@@ -323,8 +331,8 @@ class classroom:
         self.students = []
         for _ in range(players):
             p = player()
-            p.x = randint(0, cellsX // 2)
-            p.y = randint(0, cellsY // 2)
+            p.x = randint(cellsX // 4, cellsX * 3 // 4)
+            p.y = randint(cellsX // 4, 3 * cellsY // 4)
             self.students.append(p)
             self.moving_sprites.add(p)
 
@@ -409,9 +417,7 @@ class classroom:
             screen.blit(text, textRect)
 
     def draw_living(self):
-        if len(locations) > 0:
-            for loc in locations:
-                loc.drawPlayer()
+
         if not p1:
             for student in self.students:
                 if student.color == student.b_color and not student.gold:
@@ -433,6 +439,10 @@ class classroom:
 
             for c in self.cats:
                 c.drawPlayer()
+
+            if len(locations) > 0:
+                for loc in locations:
+                    loc.drawPlayer()
 
             self.moving_sprites.draw(screen)
             self.moving_sprites.update()
@@ -458,7 +468,7 @@ class classroom:
             student.lives = 3
             if student.color == student.a_color:
                 still_alive = True
-        if not still_alive or max_score >= 30 or (p1 and round(p1.x) == locations[0].x and round(p1.y) == locations[0].y):
+        if not still_alive or max_score >= 30 or (p1 and round(p1.x) <= locations[0].x + corner and round(p1.y) <= locations[0].y + corner):
             if max_score >= 30:
                 self.ticker.append(len(self.observations))
             self.round = 0
@@ -484,8 +494,6 @@ class classroom:
             student.reward = 0
             student.action = 0
             student.observation = None
-
-
 
         self.reporter.score = b_score
         self.round += 1
@@ -598,7 +606,7 @@ class classroom:
                         gameState[x, y] = 0
                 return True
 
-        if p1 and round(p1.x) == locations[0].x and round(p1.y) == locations[0].y:
+        if p1 and round(p1.x) <= locations[0].x + corner and round(p1.y) <= locations[0].y + corner:
             print("Player found the Castle!!!")
             return True
 
@@ -641,6 +649,7 @@ class player(pygame.sprite.Sprite):
             self.color = self.a_color
             self.x = cellsX // 2
             self.y = cellsY // 2
+        self.saves = 0
         self.team = None
         self.lives = 3
         self.hp = 3
@@ -744,7 +753,7 @@ class player(pygame.sprite.Sprite):
         if self.cat:
             self.image = pygame.transform.scale(self.image, (int(self.size[0]/1), int(self.size[1]/1)))
         elif self.castle:
-            self.image = pygame.transform.scale(self.image, (int(self.size[0]), int(self.size[1])))
+            self.image = pygame.transform.scale(self.image, (int(2*self.size[0]), int(2*self.size[1])))
         else:
             self.image = pygame.transform.scale(self.image, (int(self.size[0]/2.2), int(self.size[1]/2.2)))
         self.rect = self.image.get_rect()
@@ -781,7 +790,7 @@ class player(pygame.sprite.Sprite):
         textRect = text.get_rect()
         textRect.x += windowSize[0] * 3 // 4 - 12
         textRect.y += 0
-        screen.blit(text, textRect)
+        # screen.blit(text, textRect)
 
         line = f"Lives {'l' * self.hp}"
         text = font.render(line, True, p1.color, turf)
@@ -789,7 +798,7 @@ class player(pygame.sprite.Sprite):
         textRect = text.get_rect()
         textRect.x += windowSize[0] * 3 // 4 - 12
         textRect.y += res
-        screen.blit(text, textRect)
+        # screen.blit(text, textRect)
 
         font = pygame.font.Font('freesansbold.ttf', 12)
         percent = round((float(self.dmg)-1)*100)
@@ -801,7 +810,7 @@ class player(pygame.sprite.Sprite):
             textRect = text.get_rect()
             textRect.x += windowSize[0] * 3 // 4 - 12
             textRect.y += res*2 + res*2//3
-            screen.blit(text, textRect)
+            # screen.blit(text, textRect)
         if self.armor > 0:
             if self.armor == 1:
                 line = f"Light Armor"
@@ -814,7 +823,7 @@ class player(pygame.sprite.Sprite):
             textRect = text.get_rect()
             textRect.x += windowSize[0]* 3 // 4 - 12
             textRect.y += res * 2
-            screen.blit(text, textRect)
+            # screen.blit(text, textRect)
 
     def get_observable(self, state):
         if p1:
@@ -877,7 +886,6 @@ castle = player()
 castle.set_castle()
 locations.append(castle)
 c1 = classroom()
-# c1.moving_sprites.add(castle)
 p1 = None
 overlay = False
 p1 = player()
@@ -891,6 +899,8 @@ c = player()
 c.set_cat()
 c1.cats.append(c)
 c1.moving_sprites.add(c)
+c1.moving_sprites.add(castle)
+
 
 
 ### Welcome screen and game controls ###
@@ -1111,7 +1121,7 @@ def sound_message():
         c1.cats.append(c)
         c1.moving_sprites.add(c)
 
-        messagebox.showerror('You Died!', f'Score {c1.battle + p1.kills}')
+        messagebox.showerror('You Died!', f'{c1.battle} Rounds\n{p1.saves} Kittens Saved\n{p1.kills} Goblin Kills\n{round(p1.armor,2)} Armour\n{round(p1.dmg*100)}% Damage')
         c1.battle = 0
         delay = default_delay
         focusWindow()
@@ -1136,7 +1146,7 @@ def sound_message():
         q = player()
         c1.students.append(q)
         c1.moving_sprites.add(q)
-        messagebox.showerror('Game Over', f'Goblins took over the land...\nScore {c1.battle + p1.kills}')
+        messagebox.showerror('Game Over', f'Goblins took over the land...\n{c1.battle} Rounds\n{p1.saves} Kittens Saved\n{p1.kills} Goblin Kills\n{round(p1.armor,2)} Armour\n{round(p1.dmg*100)}% Damage')
         c1.battle = 0
         delay = default_delay
         focusWindow()
@@ -1309,7 +1319,7 @@ def nextGeneration():
                     student.living = False
                     c1.moving_sprites.remove(student)
                     p1.kills += 1
-        if round(p1.x) == locations[0].x and round(p1.y) == locations[0].y:
+        if round(p1.x) <= locations[0].x+corner and round(p1.y) <= locations[0].y + corner:
             p1.ding = True
 
         for cat in c1.cats:
@@ -1320,14 +1330,15 @@ def nextGeneration():
                 if not cat.cart_pose:
                     cat.cart_pose = randint(3, 5)
                 cat.scooped = p1
-            if cat.x == locations[0].x and cat.y == locations[0].y:
-                if not cat.pur:
-                    cat.scooped = False
-                    cat.meow = True
-                    cat.pur = True
-                else:
-                    cat.x = locations[0].x
-                    cat.y = locations[0].y
+                p1.saves += 1
+            if cat.x <= locations[0].x +corner and cat.y <= locations[0].y + corner:
+                # if not cat.pur:
+                #     cat.scooped = False
+                #     cat.meow = True
+                #     cat.pur = True
+                # else:
+                #     cat.x = locations[0].x
+                #     cat.y = locations[0].y
                 cat.scooped = False
             if cat.scooped:
                 cat.x = cat.scooped.x
@@ -1568,7 +1579,7 @@ learning_rate = 0.8
 choices = [0, 1, 2, 3, 4]
 
 if p1:
-    messagebox.showwarning('Goblins & Kittens', f"Get to the safehouse!\nAvoid Goblins until you're ready..")
+    messagebox.showwarning('Goblins & Kittens', f"Rescue the Kittens!\nAvoid Goblins until you're ready..")
     focusWindow()
 
 while True:
