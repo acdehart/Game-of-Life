@@ -1121,13 +1121,15 @@ def sound_message():
         c1.cats.append(c)
         c1.moving_sprites.add(c)
 
-        messagebox.showerror('You Died!', f'{c1.battle} Rounds\n{p1.saves} Kittens Saved\n{p1.kills} Goblin Kills\n{round(p1.armor,2)} Armour\n{round(p1.dmg*100)}% Damage')
+        messagebox.showerror('You Died!', f'{c1.battle} Rounds\n{p1.saves} Kittens Saved\n{p1.kills} Goblin Kills\n{round(p1.armor,2)} Armour\n+{round(p1.dmg*100-100)}% Damage')
         c1.battle = 0
         delay = default_delay
         focusWindow()
         p1.hp = 3
         p1.dmg = 1
         p1.armor = 0
+        p1.kills = 0
+        p1.saves = 0
         p1.living = True
         p1.x = cellsX - 1
         p1.y = cellsY - 1
@@ -1146,13 +1148,15 @@ def sound_message():
         q = player()
         c1.students.append(q)
         c1.moving_sprites.add(q)
-        messagebox.showerror('Game Over', f'Goblins took over the land...\n{c1.battle} Rounds\n{p1.saves} Kittens Saved\n{p1.kills} Goblin Kills\n{round(p1.armor,2)} Armour\n{round(p1.dmg*100)}% Damage')
+        messagebox.showerror('Game Over', f'Goblins took over the land...\n{c1.battle} Rounds\n{p1.saves} Kittens Saved\n{p1.kills} Goblin Kills\n{round(p1.armor,2)} Armour\n+{round(p1.dmg*100-100)}% Damage')
         c1.battle = 0
         delay = default_delay
         focusWindow()
         p1.hp = 3
         p1.dmg = 1
         p1.armor = 0
+        p1.saves = 0
+        p1.kills = 0
         p1.living = True
         p1.x = cellsX -1
         p1.y = cellsY -1
@@ -1176,6 +1180,7 @@ def sound_message():
             c1.battle = 0
             p1.armor = 0
             p1.kills = 0
+            p1.saves = 0
             p1.dmg = 1
             reset_clouds()
             c1.init_students()
