@@ -300,6 +300,23 @@ class classroom:
 
         self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
+    def count_scooped(self):
+        cart_cats = 0
+        for cat in self.cats:
+            if cat.scooped != False:
+                cart_cats += 1
+        return cart_cats
+
+    def cats_all_home(self):
+        house_cats = 0
+        for cat in self.cats:
+            if round(cat.x) == locations[0].x and round(cat.y) == locations[0].y:
+                house_cats += 1
+        if house_cats == len(self.cats):
+            return True
+        else:
+            return False
+
     def init_students(self):
         for s in self.students:
             s.kill()
@@ -640,6 +657,8 @@ class player(pygame.sprite.Sprite):
         self.sneak = False
         self.oof = False
         self.rawr = False
+        self.pur = False
+        self.cart_pose = None
         self.ding = False
         self.meow = False
         self.scooped = False
@@ -667,11 +686,14 @@ class player(pygame.sprite.Sprite):
         self.human = False
         self.cat = True
         self.sprites = []
-        self.sprites.append(pygame.image.load("sprites/cats/Idle0Orange.png"))
-        self.sprites.append(pygame.image.load("sprites/cats/Idle1Orange.png"))
-        self.sprites.append(pygame.image.load("sprites/cats/Idle2Orange.png"))
-        self.sprites.append(pygame.image.load("sprites/cats/Idle3Orange.png"))
-        self.sprites.append(pygame.image.load("sprites/cats/Crouch0Orange.png"))
+        self.color = random.choice(['Orange', 'Black'])
+        self.sprites.append(pygame.image.load(f"sprites/cats/Idle0{self.color}.png"))
+        self.sprites.append(pygame.image.load(f"sprites/cats/Idle1{self.color}.png"))
+        self.sprites.append(pygame.image.load(f"sprites/cats/Idle2{self.color}.png"))
+        self.sprites.append(pygame.image.load(f"sprites/cats/Idle3{self.color}.png"))
+        self.sprites.append(pygame.image.load(f"sprites/cats/Crouch0{self.color}.png"))
+        self.sprites.append(pygame.image.load(f"sprites/cats/loaf0{self.color}.png"))
+        self.sprites.append(pygame.image.load(f"sprites/cats/loaf1{self.color}.png"))
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
@@ -696,7 +718,10 @@ class player(pygame.sprite.Sprite):
         if self.cat:
             self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)-1))]
             if self.scooped:
-                self.image = self.sprites[4]
+                # print(self.cart_pose)
+                self.image = self.sprites[(self.cart_pose+3)%len(self.sprites)]
+            if self.pur:
+                self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+4))]
         else:
             self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
         self.size = self.image.get_size()
@@ -965,6 +990,7 @@ def showControls():
 oof_sound = path + 'music' + os.sep + 'OOF.wav'
 ding_sound = path + 'music' + os.sep + 'ding.wav'
 rawr_sound = path + 'music' + os.sep + 'RAWR.wav'
+meow_sound = path + 'music' + os.sep + 'meow.wav'
 flipper = False
 pygame.mixer.init()
 pygame.mixer.music.set_volume(1)
@@ -1044,10 +1070,19 @@ def sound_message():
             pygame.mixer.music.load(rawr_sound)
             pygame.mixer.music.play()
             student.rawr = False
+    for cat in c1.cats:
+        if cat.meow:
+            pygame.mixer.music.load(meow_sound)
+            pygame.mixer.music.play()
+            cat.meow = False
+
+
     if (p1 and p1.hp <= 0):
         print("You Died!")
         for s in c1.students:
             s.kill()
+        for c in c1.cats:
+            c.kill()
         c1.students = []
         p = player()
         c1.students.append(p)
@@ -1055,6 +1090,11 @@ def sound_message():
         q = player()
         c1.students.append(q)
         c1.moving_sprites.add(q)
+        c = player()
+        c.set_cat()
+        c1.cats.append(c)
+        c1.moving_sprites.add(c)
+
         messagebox.showerror('You Died!', f'Score {c1.battle + p1.kills}')
         c1.battle = 0
         delay = default_delay
@@ -1095,11 +1135,6 @@ def sound_message():
         c1.battle += 1
         c1.transition = True
 
-        for cat in c1.cats:
-            cat.scooped = False
-            cat.x = randint(cellsX//4, cellsX*3//4)
-            cat.y = randint(cellsY//4, cellsY*3//4)
-
         if c1.battle % 2:
             delay = delay*.95
 
@@ -1110,18 +1145,6 @@ def sound_message():
         p1.x = cellsX - 1
         p1.y = cellsY - 1
 
-        # message_window = tkinter.Toplevel(tkRoot)
-        # message_window.positionfrom()
-        # message_window.title("Level Passed")
-        # label = tkinter.Label(message_window, text='Chose Upgrade')
-        # dmg_btn = tkinter.Button(message_window, text = "+1 DMG")
-        # dmg_btn.pack(side=tkinter.LEFT)
-        # arm_btn = tkinter.Button(message_window, text="+1 Armor")
-        # arm_btn.pack(side=tkinter.LEFT)
-        # hp_btn = tkinter.Button(message_window, text="+1 Max HP")
-        # hp_btn.pack(side=tkinter.RIGHT)
-        # label.pack(side=tkinter.TOP)
-        # tkRoot.mainloop()
         if c1.count_living() == 0:
             messagebox.showinfo('Level Passed', f'Victory!\nWon in {c1.battle} rounds')
             c1.battle = 0
@@ -1130,23 +1153,33 @@ def sound_message():
             p1.dmg = 1
             reset_clouds()
             c1.init_students()
+        # SALL GOOD MAN
         elif c1.battle < max_level and p1.hp > 0:
-            upgrade = random.choice(['Found Weapon!', 'Found Armor!', 'Recover Max HP', 'More and more Goblins\nterrorize the land...'])
-            messagebox.showinfo('Level Passed', upgrade)
-            if 'Found Weapon!' == upgrade:
-                p1.dmg = min(p1.dmg + .25, 2)
-            elif 'Found Armor!' == upgrade:
-                p1.armor += 1
-            elif 'Recover Max HP' == upgrade:
-                p1.hp = max_hp
-            elif 'More and more' in upgrade:
-                p = player()
-                p.drawPlayer()
-                c1.students.append(p)
-                c1.moving_sprites.add(p)
 
-            print(f"Upgrade: {upgrade}, arm {p1.armor}")
-            upgrade = None
+            if c1.count_scooped() == len(c1.cats):
+                upgrade = random.choice(['Found Weapon!', 'Found Armor!', 'Recover Max HP', 'More and more Goblins\nterrorize the land...'])
+                messagebox.showinfo('Level Passed', upgrade)
+                if 'Found Weapon!' == upgrade:
+                    p1.dmg = min(p1.dmg + .25, 2)
+                elif 'Found Armor!' == upgrade:
+                    p1.armor += 1
+                elif 'Recover Max HP' == upgrade:
+                    p1.hp = max_hp
+                elif 'More and more' in upgrade:
+                    p = player()
+                    p.drawPlayer()
+                    c1.students.append(p)
+                    c1.moving_sprites.add(p)
+
+                print(f"Upgrade: {upgrade}, arm {p1.armor}")
+                upgrade = None
+            elif c1.battle > 0:
+                messagebox.showinfo('Level Passed', "Some cats were abandoned along the way...")
+
+        for cat in c1.cats:
+            cat.scooped = False
+            cat.x = randint(cellsX//4, cellsX*3//4)
+            cat.y = randint(cellsY//4, cellsY*3//4)
 
         focusWindow()
 
@@ -1164,10 +1197,17 @@ def sound_message():
             p.lives = p.lives + c1.battle*2
             p.dmg = c1.battle*2
             p.color = (0, grass[1]/c1.battle, 0)
+            c1.students.append(p)
+
+        else:
+            p.set_cat()
+            p.cart_pose = c1.battle
+            c1.cats.append(p)
 
         if c1.count_living() < 16:
-            c1.students.append(p)
             c1.moving_sprites.add(p)
+
+
 
         # new_castle = player()
         # castle.color = (0, 0, 0)
@@ -1177,7 +1217,6 @@ def sound_message():
         # locations[1].x = cellsX-1
         # p1.x = locations[1].x
         # p1.y = locations[1].y
-
 
 def liveNeighbors(x, y):
     ''' Count the number of live neighbors of cell (x, y) '''
@@ -1259,15 +1298,25 @@ def nextGeneration():
 
         for cat in c1.cats:
             if cat.x == round(p1.x) and cat.y == round(p1.y):
-                print("Mrow")
                 # pygame.mixer.music.load(meow_sound)
                 # pygame.mixer.music.play()
-                cat.current_sprite = len(cat.sprites)
                 cat.meow = True
+                if not cat.cart_pose:
+                    cat.cart_pose = randint(3, 5)
                 cat.scooped = p1
+            if cat.x == locations[0].x and cat.y == locations[0].y:
+                if not cat.pur:
+                    cat.scooped = False
+                    cat.meow = True
+                    cat.pur = True
+                else:
+                    cat.x = locations[0].x
+                    cat.y = locations[0].y
+                cat.scooped = False
             if cat.scooped:
                 cat.x = cat.scooped.x
                 cat.y = cat.scooped.y-.7
+                cat.current_sprite = cat.cart_pose
             # p1.hp = min(p1.hp+1, max_hp)
 
     updateGameState(newGameState)
