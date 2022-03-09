@@ -669,6 +669,7 @@ class player(pygame.sprite.Sprite):
         self.observation = None
         self.cat = False
         self.human = False
+        self.castle = False
         # self.image = None
         # self.rect = None
 
@@ -695,13 +696,25 @@ class player(pygame.sprite.Sprite):
         self.sprites.append(pygame.image.load(f"sprites/cats/loaf0{self.color}.png"))
         self.sprites.append(pygame.image.load(f"sprites/cats/loaf1{self.color}.png"))
 
+    def set_castle(self):
+        self.human = False
+        self.castle = True
+        self.color = (0, 0, 0)
+        self.x = 0
+        self.y = 0
+        self.sprites.append(pygame.image.load(f"sprites/castle.png"))
+        self.sprites.append(pygame.image.load(f"sprites/castle.png"))
+
+
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
 
         if self.color == (0, 0, 0):
+            # pass
+
             pygame.draw.rect(screen, black, pygame.Rect(0, 0, res, res))
             pygame.draw.rect(screen, (165, 42, 42), pygame.Rect(res/3+1, res/2, res/3+1, res/2))
-
+            #
             if c1.battle > 0:
                 pygame.draw.rect(screen, black, pygame.Rect(res*(cellsX-1), res*(cellsY-1), res, res))
                 pygame.draw.rect(screen, (165, 42, 42), pygame.Rect((cellsX-1)*res-1+res/3+2, res*(cellsY-1)+res/2, res/3+1, res/2))
@@ -721,12 +734,17 @@ class player(pygame.sprite.Sprite):
                 # print(self.cart_pose)
                 self.image = self.sprites[(self.cart_pose+3)%len(self.sprites)]
             if self.pur:
-                self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+4))]
+                self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+3))]
+        elif self.castle:
+            self.image = self.sprites[2]
         else:
             self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
         self.size = self.image.get_size()
+
         if self.cat:
             self.image = pygame.transform.scale(self.image, (int(self.size[0]/1), int(self.size[1]/1)))
+        elif self.castle:
+            self.image = pygame.transform.scale(self.image, (int(self.size[0]), int(self.size[1])))
         else:
             self.image = pygame.transform.scale(self.image, (int(self.size[0]/2.2), int(self.size[1]/2.2)))
         self.rect = self.image.get_rect()
@@ -856,12 +874,10 @@ class player(pygame.sprite.Sprite):
 # Define landscape
 locations = []
 castle = player()
-# castle.set_goblin()
-castle.color = (0, 0, 0)
-castle.x = 0
-castle.y = 0
+castle.set_castle()
 locations.append(castle)
 c1 = classroom()
+# c1.moving_sprites.add(castle)
 p1 = None
 overlay = False
 p1 = player()
