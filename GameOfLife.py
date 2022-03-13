@@ -949,6 +949,8 @@ class player(pygame.sprite.Sprite):
             self.action = np.random.choice(choices)
         elif self.x < res//4 and self.y < res//4:
             self.action = random.choice([2, 4])
+        elif not self.human and self.x > cellsX-4 and self.y > cellsY-4:
+            self.action = random.choice([1, 3])
         else:
             # self.action = np.argmax(c1.model.predict(self.observation)[0])
             pass
