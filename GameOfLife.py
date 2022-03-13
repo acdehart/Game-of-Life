@@ -298,6 +298,15 @@ GoblinSS = SpriteSheet(goblin_filename)
 goblin_swing_filename = 'sprites/Goblin/Goblin Stab 2.png'
 GoblinSwingSS = SpriteSheet(goblin_swing_filename)
 
+evil_head_filename = 'sprites/Evil Head/Evil Head Biting.png'
+EvilHeadSS = SpriteSheet(evil_head_filename)
+
+rotting_skull_file = 'sprites/Evil Skull/Skull Rotten Biting.png'
+RottingSkullSS = SpriteSheet(rotting_skull_file)
+
+white_skull_file = 'sprites/Evil Skull/Skull Biting.png'
+WhiteSkullSS = SpriteSheet(white_skull_file)
+
 cart_filename = 'sprites/CART.png'
 CartSS = SpriteSheet(cart_filename)
 
@@ -809,7 +818,8 @@ class player(pygame.sprite.Sprite):
 
         else:
             if self.armor > 0 and not self.human:
-                pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
+                pass
+                # pygame.draw.circle(screen, self.color, [res * self.x + circ_rad, res * self.y + circ_rad], circ_rad)
 
         self.current_sprite += 1
         # self.image = self.sprites[0]
@@ -839,6 +849,10 @@ class player(pygame.sprite.Sprite):
                 # self.current_sprite%252
                 # self.current_sprite * 121 % 605
                 self.image = self.piece_ss.image_at((self.current_sprite*84%252, 10, 82, 72), colorkey=(0,0,0))
+            elif self.piece_ss == EvilHeadSS:
+                self.image = self.piece_ss.image_at((self.current_sprite*118%354, 20, 118, 116), colorkey=(0,0,0))
+            elif self.piece_ss == RottingSkullSS or self.piece_ss == WhiteSkullSS:
+                self.image = self.piece_ss.image_at((self.current_sprite*92%460, 20, 92, 95), colorkey=(0,0,0))
             else:
                 self.image = self.piece_ss.image_at((self.current_sprite*48%144, self.goblin_row*64%256, 40, 64), colorkey=(0,0,0))
 
@@ -1193,7 +1207,6 @@ def sound_message():
             pygame.mixer.music.play()
             cat.meow = False
 
-
     if (p1 and p1.hp <= 0):
         print("You Died!")
         for s in c1.students:
@@ -1309,6 +1322,12 @@ def sound_message():
         if c1.battle >= 4:
             p.x = randint(cellsX//2, cellsX-1)
             p.y = randint(cellsY//2, cellsY-1)
+            p.piece_ss = random.choice([EvilHeadSS, RottingSkullSS, WhiteSkullSS])
+            if c1.battle > 10:
+                p.piece_ss = RottingSkullSS
+            if c1.battle > 20:
+                p.piece_ss = WhiteSkullSS
+
             # p.x = randint(0, cellsX // (1 + c1.battle))
             # p.y = randint(0, cellsY // (1 + c1.battle))
             p.armor = c1.battle
@@ -1317,15 +1336,15 @@ def sound_message():
             p.dmg = c1.battle*2
             p.color = (0, grass[1]/c1.battle, 0)
             c1.students.append(p)
+            c1.moving_sprites.add(p)
 
         else:
             p.set_cat()
             p.position_cat()
             p.cart_pose = c1.battle
             c1.cats.append(p)
-
-        if c1.count_living() < 16:
             c1.moving_sprites.add(p)
+
 
 
 
@@ -1399,7 +1418,8 @@ def nextGeneration():
                 # student.lives -= p1.dmg
                 student.hp -= p1.dmg
                 student.lives -= p1.dmg
-                student.piece_ss = GoblinSwingSS
+                if student.piece_ss == GoblinSS:
+                    student.piece_ss = GoblinSwingSS
 
                 if student.hp > 0:
                     p1.hp -= max(student.dmg-p1.armor, 0)
