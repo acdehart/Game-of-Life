@@ -78,7 +78,7 @@ windowSize = 300, 200
 res = 20
 max_hp = 3
 players = 2
-corner = 0
+corner = 2
 width, height = windowSize
 safety_radius = 0.7
 screen = pygame.display.set_mode(windowSize)
@@ -849,6 +849,8 @@ class player(pygame.sprite.Sprite):
                 # self.current_sprite%252
                 # self.current_sprite * 121 % 605
                 self.image = self.piece_ss.image_at((self.current_sprite*84%252, 10, 82, 72), colorkey=(0,0,0))
+                if self.timer + 4 < len(states):
+                    self.piece_ss = GoblinSS
             elif self.piece_ss == EvilHeadSS:
                 self.image = self.piece_ss.image_at((self.current_sprite*118%354, 20, 118, 116), colorkey=(0,0,0))
             elif self.piece_ss == RottingSkullSS or self.piece_ss == WhiteSkullSS:
@@ -972,16 +974,16 @@ class player(pygame.sprite.Sprite):
     def move_on_prediction(self, prediction):
         wall = 0
         if prediction == 1:  # UP
-            if self.y > wall:
+            if self.y > wall+.5:
                 self.y -= self.acc*1/self.speed_mod
         if prediction == 2:  # DOWN
-            if self.y <= cellsY - wall - 2:
+            if self.y <= cellsY - wall - 1.5:
                 self.y += self.acc*1/self.speed_mod
         if prediction == 3:  # LEFT
-            if self.x > wall:
+            if self.x > wall+.5:
                 self.x -= self.acc*1/self.speed_mod
         if prediction == 4:  # RIGHT
-            if self.x <= cellsX - wall - 2:
+            if self.x <= cellsX - wall - 1.5:
                 self.x += self.acc*1/self.speed_mod
 
 
@@ -1419,6 +1421,7 @@ def nextGeneration():
                 student.hp -= p1.dmg
                 student.lives -= p1.dmg
                 if student.piece_ss == GoblinSS:
+                    student.timer = len(states)
                     student.piece_ss = GoblinSwingSS
 
                 if student.hp > 0:
