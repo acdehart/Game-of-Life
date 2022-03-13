@@ -310,7 +310,7 @@ RottingSkullSS = SpriteSheet(rotting_skull_file)
 white_skull_file = 'sprites/Evil Skull/Skull Biting.png'
 WhiteSkullSS = SpriteSheet(white_skull_file)
 
-cart_filename = 'sprites/CART.png'
+cart_filename = 'sprites/CART_2.png'
 CartSS = SpriteSheet(cart_filename)
 
 black_cat_filename = 'sprites/Cats/Black.png'
@@ -843,7 +843,7 @@ class player(pygame.sprite.Sprite):
             self.image = self.sprites[0]
         elif self.human:
             # Player
-            self.image = self.piece_ss.image_at((78, 0, 124-78, 48), colorkey=(0,0,0))
+            self.image = self.piece_ss.image_at((78, 0, 124-78, 48), colorkey=(147,168,222))
 
             # self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
         else:
@@ -970,6 +970,9 @@ class player(pygame.sprite.Sprite):
     def get_action(self):
         if np.random.random() < eps or len(states) == 0:
             self.action = np.random.choice(choices)
+            if self.piece_ss == GoblinSS and len(states)%10 == 1:
+                self.timer = len(states)
+                self.piece_ss = GoblinSwingSS
         elif self.x < res//4 and self.y < res//4:
             self.action = random.choice([2, 4])
         elif not self.human and self.x > cellsX-4 and self.y > cellsY-4:
@@ -982,16 +985,16 @@ class player(pygame.sprite.Sprite):
         wall = 0
         if prediction == 1:  # UP
             if self.y > wall+.5:
-                self.y -= self.acc*1/self.speed_mod
+                self.y -= min(self.acc*1/self.speed_mod, 1)
         if prediction == 2:  # DOWN
             if self.y <= cellsY - wall - 1.5:
-                self.y += self.acc*1/self.speed_mod
+                self.y += min(self.acc*1/self.speed_mod, 1)
         if prediction == 3:  # LEFT
             if self.x > wall+.5:
-                self.x -= self.acc*1/self.speed_mod
+                self.x -= min(self.acc*1/self.speed_mod, 1)
         if prediction == 4:  # RIGHT
             if self.x <= cellsX - wall - 1.5:
-                self.x += self.acc*1/self.speed_mod
+                self.x += min(self.acc*1/self.speed_mod, 1)
 
 
 # Define landscape
@@ -1740,8 +1743,8 @@ while True:
                     pygame.mixer.music.load(rawr_sound)
                     pygame.mixer.music.play()
                     p = player()
-                    p.x = randint(cellsX // 3, cellsX - 1)
-                    p.y = randint(cellsY // 3, cellsY - 1)
+                    p.x = randint(cellsX // 3, cellsX//2)
+                    p.y = randint(cellsY // 3, cellsY//2)
                     p.speed_mod = 2
                     c1.students.append(p)
                     c1.moving_sprites.add(p)
