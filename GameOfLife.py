@@ -6,6 +6,8 @@ from tkinter import messagebox
 from collections import deque
 from time import time, sleep
 # from sound import Sound
+import pygame
+
 
 import cv2
 import numpy as np
@@ -146,6 +148,7 @@ lastTime = 0.0
 poly = numpy.full((cellsX, cellsY), None)
 
 
+
 def updateCellsBorders():
     ''' Update cells borders with the current width and height for each cell '''
     for y in range(0, cellsY):
@@ -250,9 +253,62 @@ def check_if_future_safe(choice, future):
     if choice == 3:  # Move left
         if future[y_mid][x_mid - 1]:
             return True
-    if choice == 4:  # Move down
+    if choice == 4:  # Move right
         if future[y_mid][x_mid + 1]:
             return True
+
+
+class SpriteSheet:
+
+    def __init__(self, filename):
+        """Load the sheet."""
+        try:
+            self.sheet = pygame.image.load(filename).convert()
+        except pygame.error as e:
+            print(f"Unable to load spritesheet image: {filename}")
+            raise SystemExit(e)
+
+    def image_at(self, rectangle, colorkey = None):
+        """Load a specific image from a specific rectangle."""
+        # Loads image from x, y, x+offset, y+offset.
+        rect = pygame.Rect(rectangle)
+        image = pygame.Surface(rect.size).convert(24)
+        image.blit(self.sheet, (0, 0), rect)
+        if colorkey is not None:
+            if colorkey is -1:
+                colorkey = image.get_at((0,0))
+            image.set_colorkey(colorkey, pygame.RLEACCEL)
+        return image
+
+    def images_at(self, rects, colorkey = None):
+        """Load a whole bunch of images and return them as a list."""
+        return [self.image_at(rect, colorkey) for rect in rects]
+
+    def load_strip(self, rect, image_count, colorkey = None):
+        """Load a whole strip of images, and return them as a list."""
+        tups = [(rect[0]+rect[2]*x, rect[1], rect[2], rect[3])
+                for x in range(image_count)]
+        return self.images_at(tups, colorkey)
+
+
+# goblin_filename = 'sprites/Goblin/Goblin Dying Pose.png'
+goblin_filename = 'sprites/Goblin/$Goblin.png'
+GoblinSS = SpriteSheet(goblin_filename)
+
+goblin_swing_filename = 'sprites/Goblin/Goblin Stab 2.png'
+GoblinSwingSS = SpriteSheet(goblin_swing_filename)
+
+cart_filename = 'sprites/CART.png'
+CartSS = SpriteSheet(cart_filename)
+
+black_cat_filename = 'sprites/Cats/Black.png'
+catBlackSS = SpriteSheet(black_cat_filename)
+
+orange_cat_filename = 'sprites/Cats/Orange.png'
+catOrangeSS = SpriteSheet(orange_cat_filename)
+
+yellow_cat_filename = 'sprites/Cats/Yellow.png'
+catYellowSS = SpriteSheet(yellow_cat_filename)
 
 
 class classroom:
@@ -514,6 +570,7 @@ class classroom:
             if student.living:
 
                 if not student.human:
+
                     student.move_on_prediction(student.action)
         if p1 and p1.living:
             p1.move_on_prediction(p1.action)
@@ -546,8 +603,9 @@ class classroom:
     def update_model(self):
         for student in self.students:
             if student.living and student.reward != 0:
-                target = student.reward + discount_factor * np.max(c1.model.predict(student.observation)[0])
-                target_vector = c1.model.predict(student.observation)[0]
+                prediction = c1.model.predict(student.observation)[0]
+                target = student.reward + discount_factor * np.max(prediction)
+                target_vector = prediction
                 target_vector[student.action] = target
                 tv = target_vector.reshape(-1, 5)
                 self.observations.append(student.observation)
@@ -639,7 +697,7 @@ class player(pygame.sprite.Sprite):
         if color:
             self.color = (0, 0, 255)
             self.x = 2 * cellsX // 3
-            self.y = cellsY // 3
+            self.y = 2 * cellsY // 3
         else:
             a = randint(0, 128)
             self.a_color = tuple([a, 128, 128 - a])
@@ -668,6 +726,7 @@ class player(pygame.sprite.Sprite):
         self.rawr = False
         self.pur = False
         self.cart_pose = None
+        self.goblin_row = 0
         self.ding = False
         self.meow = False
         self.scooped = False
@@ -684,26 +743,45 @@ class player(pygame.sprite.Sprite):
 
     def set_goblin(self):
         self.human = False
-        self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
-        self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
+        # self.sprites.append(pygame.image.load("sprites/Goblin/R0Goblin Dying Pose.png"))
+        # self.sprites.append(pygame.image.load("sprites/Goblin/R1Goblin Dying Pose.png"))
+        # self.filename = 'sprites/Goblin/$Goblin.png'
+        self.piece_ss = GoblinSS
+
 
     def set_human(self):
         self.human = True
-        self.sprites = []
-        self.sprites.append(pygame.image.load("sprites/DL1CART.png"))
+        self.piece_ss = CartSS
+        # self.sprites = []
+        # self.sprites.append(pygame.image.load("sprites/DL1CART.png"))
+
+    def position_cat(self):
+        self.cat_row = randint(0, 5)
+        self.x = cellsX//2+randint(-3, 4)
+        self.y = cellsY//2+randint(-2, 3)
 
     def set_cat(self):
         self.human = False
         self.cat = True
-        self.sprites = []
-        self.color = random.choice(['Orange', 'Black'])
-        self.sprites.append(pygame.image.load(f"sprites/cats/Idle0{self.color}.png"))
-        self.sprites.append(pygame.image.load(f"sprites/cats/Idle1{self.color}.png"))
-        self.sprites.append(pygame.image.load(f"sprites/cats/Idle2{self.color}.png"))
-        self.sprites.append(pygame.image.load(f"sprites/cats/Idle3{self.color}.png"))
-        self.sprites.append(pygame.image.load(f"sprites/cats/Crouch0{self.color}.png"))
-        self.sprites.append(pygame.image.load(f"sprites/cats/loaf0{self.color}.png"))
-        self.sprites.append(pygame.image.load(f"sprites/cats/loaf1{self.color}.png"))
+        # self.sprites = []
+        self.color = random.choice(['Orange', 'Black', 'Yellow'])
+        if self.color == 'Black':
+            self.piece_ss = catBlackSS
+            self.cat_row = randint(0,5)
+        elif self.color == 'Orange':
+            self.piece_ss = catOrangeSS
+            self.cat_row = randint(0,5)
+        elif self.color == 'Yellow':
+            self.piece_ss = catYellowSS
+            self.cat_row = randint(0,5)
+
+        # self.sprites.append(pygame.image.load(f"sprites/cats/Idle0{self.color}.png"))
+        # self.sprites.append(pygame.image.load(f"sprites/cats/Idle1{self.color}.png"))
+        # self.sprites.append(pygame.image.load(f"sprites/cats/Idle2{self.color}.png"))
+        # self.sprites.append(pygame.image.load(f"sprites/cats/Idle3{self.color}.png"))
+        # self.sprites.append(pygame.image.load(f"sprites/cats/Crouch0{self.color}.png"))
+        # self.sprites.append(pygame.image.load(f"sprites/cats/loaf0{self.color}.png"))
+        # self.sprites.append(pygame.image.load(f"sprites/cats/loaf1{self.color}.png"))
 
     def set_castle(self):
         self.human = False
@@ -738,16 +816,31 @@ class player(pygame.sprite.Sprite):
         #     self.current_sprite = min(self.current_sprite, len(self.sprites)-1)
 
         if self.cat:
-            self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)-1))]
+            self.image = self.piece_ss.image_at((self.current_sprite*32%128, 32*self.cat_row, 32, 32), colorkey=(0,0,0))
+            # self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)-1))]
             if self.scooped:
+                self.cart_row = 5
                 # print(self.cart_pose)
-                self.image = self.sprites[(self.cart_pose+3)%len(self.sprites)]
+                # self.image = self.sprites[(self.cart_pose+3)%len(self.sprites)]
             if self.pur:
-                self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+3))]
+                self.cat_row = 6
+                # self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+3))]
         elif self.castle:
-            self.image = self.sprites[2]
+            self.image = self.sprites[0]
+        elif self.human:
+            # Player
+            self.image = self.piece_ss.image_at((78, 0, 124-78, 48), colorkey=(0,0,0))
+
+            # self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
         else:
-            self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
+            # Goblins
+            if self.piece_ss == GoblinSwingSS:
+                # self.current_sprite%252
+                # self.current_sprite * 121 % 605
+                self.image = self.piece_ss.image_at((self.current_sprite*84%252, 10, 82, 72), colorkey=(0,0,0))
+            else:
+                self.image = self.piece_ss.image_at((self.current_sprite*48%144, self.goblin_row*64%256, 40, 64), colorkey=(0,0,0))
+
         self.size = self.image.get_size()
 
         if self.cat:
@@ -853,31 +946,34 @@ class player(pygame.sprite.Sprite):
     def get_action(self):
         if np.random.random() < eps or len(states) == 0:
             self.action = np.random.choice(choices)
+        elif self.x < res//4 and self.y < res//4:
+            self.action = random.choice([2, 4])
         else:
-            self.action = np.argmax(c1.model.predict(self.observation)[0])
+            # self.action = np.argmax(c1.model.predict(self.observation)[0])
+            pass
 
     def move_on_prediction(self, prediction):
         wall = 0
         if prediction == 1:  # UP
             if self.y > wall:
                 self.y -= 1/self.speed_mod
-            elif self != p1:
-                self.y = cellsY - 1
+            # elif self != p1:
+            #     self.y = cellsY - 1
         if prediction == 2:  # DOWN
             if self.y <= cellsY - wall - 2:
                 self.y += 1/self.speed_mod
-            elif self != p1:
-                self.y = 0
+            # elif self != p1:
+            #     self.y = 0
         if prediction == 3:  # LEFT
             if self.x > wall:
                 self.x -= 1/self.speed_mod
-            elif self != p1:
-                self.x = cellsX - 1
+            # elif self != p1:
+            #     self.x = cellsX - 1
         if prediction == 4:  # RIGHT
             if self.x <= cellsX - wall - 2:
                 self.x += 1/self.speed_mod
-            elif self != p1:
-                self.x = 0
+            # elif self != p1:
+            #     self.x = 0
 
 
 # Define landscape
@@ -1019,7 +1115,7 @@ rawr_sound = path + 'music' + os.sep + 'RAWR.wav'
 meow_sound = path + 'music' + os.sep + 'meow.wav'
 flipper = False
 pygame.mixer.init()
-pygame.mixer.music.set_volume(1)
+pygame.mixer.music.set_volume(.3)
 
 
 ### Game execution ###
@@ -1034,7 +1130,7 @@ def currentCell():
 def drawCell(x, y):
     ''' Draw cell with coordinates (x, y) in the screen '''
     global brown_radius
-    brown_radius = math.sqrt(x**max(10-c1.battle, 0)+y**max(10-c1.battle, 0))
+    brown_radius = math.sqrt(x**max(5-c1.battle, 0)+y**max(5-c1.battle, 0))
     turf = (100-min(brown_radius, 100), 100, 0)
 
     pygame.draw.polygon(screen, turf, poly[x, y], 0)
@@ -1110,6 +1206,7 @@ def sound_message():
         for c in c1.cats:
             c.kill()
         c1.students = []
+        c1.cats = []
         p = player()
         c1.students.append(p)
         c1.moving_sprites.add(p)
@@ -1135,8 +1232,7 @@ def sound_message():
         p1.y = cellsY - 1
         for cat in c1.cats:
             cat.scooped = False
-            cat.x = randint(cellsX//4, cellsX*3//4)
-            cat.y = randint(cellsY//4, cellsY*3//4)
+            cat.position_cat()
 
     elif c1.battle >= max_level:
         for s in c1.students:
@@ -1186,7 +1282,6 @@ def sound_message():
             c1.init_students()
         # SALL GOOD MAN
         elif c1.battle < max_level and p1.hp > 0:
-
             if c1.count_scooped() == len(c1.cats):
                 upgrade = random.choice(['Found Weapon!', 'Found Armor!', 'Recover Max HP', 'More and more Goblins\nterrorize the land...'])
                 messagebox.showinfo('Level Passed', upgrade)
@@ -1201,17 +1296,13 @@ def sound_message():
                     p.drawPlayer()
                     c1.students.append(p)
                     c1.moving_sprites.add(p)
-
-                print(f"Upgrade: {upgrade}, arm {p1.armor}")
                 upgrade = None
             elif c1.battle > 0:
                 messagebox.showinfo('Level Passed', "Some cats were abandoned along the way...")
 
         for cat in c1.cats:
             cat.scooped = False
-            cat.x = randint(cellsX//4, cellsX*3//4)
-            cat.y = randint(cellsY//4, cellsY*3//4)
-
+            cat.position_cat()
         focusWindow()
 
         for x in range(cellsX//2):
@@ -1219,10 +1310,12 @@ def sound_message():
                 gameState[x, y] = random.choice([0, 1])
 
         p = player()
-        p.x = randint(0, cellsX // (1 + c1.battle))
-        p.y = randint(0, cellsY // (1 + c1.battle))
 
         if c1.battle >= 4:
+            p.x = randint(cellsX//2, cellsX-1)
+            p.y = randint(cellsY//2, cellsY-1)
+            # p.x = randint(0, cellsX // (1 + c1.battle))
+            # p.y = randint(0, cellsY // (1 + c1.battle))
             p.armor = c1.battle
             p.hp = p.hp + c1.battle * 2
             p.lives = p.lives + c1.battle*2
@@ -1232,6 +1325,7 @@ def sound_message():
 
         else:
             p.set_cat()
+            p.position_cat()
             p.cart_pose = c1.battle
             c1.cats.append(p)
 
@@ -1310,6 +1404,7 @@ def nextGeneration():
                 # student.lives -= p1.dmg
                 student.hp -= p1.dmg
                 student.lives -= p1.dmg
+                student.piece_ss = GoblinSwingSS
 
                 if student.hp > 0:
                     p1.hp -= max(student.dmg-p1.armor, 0)
@@ -1348,7 +1443,8 @@ def nextGeneration():
             if cat.scooped:
                 cat.x = cat.scooped.x
                 cat.y = cat.scooped.y-.7
-                cat.current_sprite = cat.cart_pose
+                cat.cat_row = 6
+                # cat.current_sprite = cat.cart_pose
             # p1.hp = min(p1.hp+1, max_hp)
 
     updateGameState(newGameState)
@@ -1605,8 +1701,8 @@ while True:
                     pygame.mixer.music.load(rawr_sound)
                     pygame.mixer.music.play()
                     p = player()
-                    p.x = random.choice([0, 1])
-                    p.y = random.choice([0, 1])
+                    p.x = randint(cellsX // 3, cellsX - 1)
+                    p.y = randint(cellsY // 3, cellsY - 1)
                     p.speed_mod = 2
                     c1.students.append(p)
                     c1.moving_sprites.add(p)
