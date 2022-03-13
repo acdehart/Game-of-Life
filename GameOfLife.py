@@ -298,6 +298,9 @@ GoblinSS = SpriteSheet(goblin_filename)
 goblin_swing_filename = 'sprites/Goblin/Goblin Stab 2.png'
 GoblinSwingSS = SpriteSheet(goblin_swing_filename)
 
+goblin_die_filename = 'sprites/Goblin/Goblin Dying Pose.png'
+GoblinDieSS = SpriteSheet(goblin_die_filename)
+
 evil_head_filename = 'sprites/Evil Head/Evil Head Biting.png'
 EvilHeadSS = SpriteSheet(evil_head_filename)
 
@@ -496,8 +499,8 @@ class classroom:
 
         if p1:
             for student in self.students:
-                if student.hp > 0:
-                    student.drawPlayer()
+                # if student.hp > 0:
+                student.drawPlayer()
 
             if p1.living:
                 p1.drawPlayer()
@@ -849,8 +852,12 @@ class player(pygame.sprite.Sprite):
                 # self.current_sprite%252
                 # self.current_sprite * 121 % 605
                 self.image = self.piece_ss.image_at((self.current_sprite*84%252, 10, 82, 72), colorkey=(0,0,0))
-                if self.timer + 4 < len(states):
+                if self.timer + 2 < len(states):
                     self.piece_ss = GoblinSS
+            elif self.piece_ss == GoblinDieSS:
+                # self.current_sprite = 0
+                self.current_sprite = min(self.current_sprite*121, 121*4)
+                self.image = self.piece_ss.image_at((self.current_sprite*121%605, 10, 121, 80), colorkey=(0,0,0))
             elif self.piece_ss == EvilHeadSS:
                 self.image = self.piece_ss.image_at((self.current_sprite*118%354, 20, 118, 116), colorkey=(0,0,0))
             elif self.piece_ss == RottingSkullSS or self.piece_ss == WhiteSkullSS:
@@ -1203,6 +1210,9 @@ def sound_message():
             pygame.mixer.music.load(rawr_sound)
             pygame.mixer.music.play()
             student.rawr = False
+            if student.piece_ss == GoblinSS:
+                student.timer = len(states)
+                student.piece_ss = GoblinSwingSS
     for cat in c1.cats:
         if cat.meow:
             pygame.mixer.music.load(meow_sound)
@@ -1435,10 +1445,13 @@ def nextGeneration():
                 if student.hp <= 0 and student.living:
                     student.rawr = True
                     student.living = False
-                    c1.moving_sprites.remove(student)
+                    student.piece_ss = GoblinDieSS
                     p1.kills += 1
         if round(p1.x) <= locations[0].x+corner and round(p1.y) <= locations[0].y + corner:
             p1.ding = True
+            for student in c1.students:
+                if student.piece_ss == GoblinDieSS:
+                    student.kill()
 
         for cat in c1.cats:
             if cat.x == round(p1.x) and cat.y == round(p1.y):
@@ -1464,6 +1477,7 @@ def nextGeneration():
                 cat.cat_row = 6
                 # cat.current_sprite = cat.cart_pose
             # p1.hp = min(p1.hp+1, max_hp)
+
 
     updateGameState(newGameState)
     updateScreen()
