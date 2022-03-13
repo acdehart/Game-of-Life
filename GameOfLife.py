@@ -712,6 +712,7 @@ class player(pygame.sprite.Sprite):
         self.lives = 3
         self.hp = 3
         self.dmg = 1
+        self.acc = .5
         self.score = 0
         self.reward = 0
         self.kills = 0
@@ -956,24 +957,16 @@ class player(pygame.sprite.Sprite):
         wall = 0
         if prediction == 1:  # UP
             if self.y > wall:
-                self.y -= 1/self.speed_mod
-            # elif self != p1:
-            #     self.y = cellsY - 1
+                self.y -= self.acc*1/self.speed_mod
         if prediction == 2:  # DOWN
             if self.y <= cellsY - wall - 2:
-                self.y += 1/self.speed_mod
-            # elif self != p1:
-            #     self.y = 0
+                self.y += self.acc*1/self.speed_mod
         if prediction == 3:  # LEFT
             if self.x > wall:
-                self.x -= 1/self.speed_mod
-            # elif self != p1:
-            #     self.x = cellsX - 1
+                self.x -= self.acc*1/self.speed_mod
         if prediction == 4:  # RIGHT
             if self.x <= cellsX - wall - 2:
-                self.x += 1/self.speed_mod
-            # elif self != p1:
-            #     self.x = 0
+                self.x += self.acc*1/self.speed_mod
 
 
 # Define landscape
@@ -1488,14 +1481,21 @@ def handle_user_input():
 
     pressed = pygame.key.get_pressed()
     if p1:
+        prev_action = p1.action
         if pressed[pygame.K_UP]:
             p1.action = 1
+            p1.acc += 0.0001
         if pressed[pygame.K_DOWN]:
             p1.action = 2
+            p1.acc += 0.0001
         if pressed[pygame.K_LEFT]:
             p1.action = 3
+            p1.acc += 0.0001
         if pressed[pygame.K_RIGHT]:
             p1.action = 4
+            p1.acc += 0.0001
+        if p1.action != prev_action:
+            p1.acc = 0
 
     for event in pygame.event.get():
 
