@@ -291,7 +291,9 @@ class SpriteSheet:
         return self.images_at(tups, colorkey)
 
 
-# goblin_filename = 'sprites/Goblin/Goblin Dying Pose.png'
+mosquito_filename = 'sprites/Mosquito/Mosquito Flying Pose.png'
+MosquitoSS = SpriteSheet(mosquito_filename)
+
 goblin_filename = 'sprites/Goblin/$Goblin.png'
 GoblinSS = SpriteSheet(goblin_filename)
 
@@ -330,6 +332,7 @@ class classroom:
         self.cats = []
         self.init_students()
         self.reporter = player()
+        self.ticker = []
         self.ticker = []
         self.ticker_norm = None
         self.reporter.color = self.reporter.b_color
@@ -841,16 +844,17 @@ class player(pygame.sprite.Sprite):
                 # self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+3))]
         elif self.castle:
             self.image = self.sprites[0]
-        elif self.human:
-            # Player
-            self.image = self.piece_ss.image_at((78, 0, 124-78, 48), colorkey=(147,168,222))
-
+        elif self.piece_ss == CartSS:
+            if self.action in [3, 4]:
+                self.image = self.piece_ss.image_at((124, 0, 172-124, 48), colorkey=(147,168,222))
+            elif self.action in [1, 2]:
+                self.image = self.piece_ss.image_at((0, 0, 33, 48), colorkey=(147,168,222))
+            else:
+                self.image = self.piece_ss.image_at((78, 0, 124-78, 48), colorkey=(147,168,222))
             # self.image = self.sprites[int((self.current_sprite//len(self.sprites)) % len(self.sprites))]
         else:
             # Goblins
             if self.piece_ss == GoblinSwingSS:
-                # self.current_sprite%252
-                # self.current_sprite * 121 % 605
                 self.image = self.piece_ss.image_at((self.current_sprite*84%252, 10, 82, 72), colorkey=(0,0,0))
                 if self.timer + 2 < len(states):
                     self.piece_ss = GoblinSS
@@ -862,6 +866,8 @@ class player(pygame.sprite.Sprite):
                 self.image = self.piece_ss.image_at((self.current_sprite*118%354, 20, 118, 116), colorkey=(0,0,0))
             elif self.piece_ss == RottingSkullSS or self.piece_ss == WhiteSkullSS:
                 self.image = self.piece_ss.image_at((self.current_sprite*92%460, 20, 92, 95), colorkey=(0,0,0))
+            elif self.piece_ss == MosquitoSS:
+                self.image = self.piece_ss.image_at((self.current_sprite*94%188, 20, 94, 89), colorkey=(0,0,0))
             else:
                 self.image = self.piece_ss.image_at((self.current_sprite*48%144, self.goblin_row*64%256, 40, 64), colorkey=(0,0,0))
 
@@ -1007,6 +1013,7 @@ p1 = None
 overlay = False
 p1 = player()
 p1.set_human()
+# p1.hp = 10000
 p1.x = cellsX - 1
 p1.y = cellsY - 1
 p1.human = True
@@ -1260,6 +1267,9 @@ def sound_message():
     elif c1.battle >= max_level:
         for s in c1.students:
             s.kill()
+        for k in c1.cats:
+            k.kill()
+        c1.cats = []
         c1.students = []
         p = player()
         c1.students.append(p)
@@ -1337,14 +1347,14 @@ def sound_message():
         if c1.battle >= 4:
             p.x = randint(cellsX//2, cellsX-1)
             p.y = randint(cellsY//2, cellsY-1)
-            p.piece_ss = random.choice([EvilHeadSS, RottingSkullSS, WhiteSkullSS])
-            if c1.battle > 10:
+            p.piece_ss = EvilHeadSS
+            if c1.battle > max_level-20:
                 p.piece_ss = RottingSkullSS
-            if c1.battle > 20:
+            if c1.battle > max_level - 15:
                 p.piece_ss = WhiteSkullSS
+            if c1.battle > max_level - 10:
+                p.piece_ss = MosquitoSS
 
-            # p.x = randint(0, cellsX // (1 + c1.battle))
-            # p.y = randint(0, cellsY // (1 + c1.battle))
             p.armor = c1.battle
             p.hp = p.hp + c1.battle * 2
             p.lives = p.lives + c1.battle*2
@@ -1360,17 +1370,6 @@ def sound_message():
             c1.cats.append(p)
             c1.moving_sprites.add(p)
 
-
-
-
-        # new_castle = player()
-        # castle.color = (0, 0, 0)
-        # castle.x = 0
-        # castle.y = cellsY-1
-        # locations.insert(0, castle)
-        # locations[1].x = cellsX-1
-        # p1.x = locations[1].x
-        # p1.y = locations[1].y
 
 def liveNeighbors(x, y):
     ''' Count the number of live neighbors of cell (x, y) '''
@@ -1738,7 +1737,7 @@ while True:
             if len(states) > 1:
                 c1.update_model()
                 c1.rebase_students()
-                if len(states) % 60 == 1 and c1.count_living() < 20:
+                if len(states) % 60 == 1 and c1.count_living() < 10:
                     reset_clouds()
                     pygame.mixer.music.load(rawr_sound)
                     pygame.mixer.music.play()
