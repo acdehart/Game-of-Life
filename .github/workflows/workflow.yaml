@@ -54,9 +54,6 @@ jobs:
         run: dir
         shell: cmd
 
-      - name: 'Echo download path'
-        run: echo ${{steps.download.outputs.download-path}}
-
       - name: Download Artifacts
         uses: actions/download-artifact@v2
         id: download
@@ -64,4 +61,5 @@ jobs:
           name: Goblins-And-Kittens
           path: Game-of-Life/dist/Goblins-And-Kittens.exe
 
-
+      - name: 'Echo download path'
+        run: echo ${{steps.download.outputs.download-path}}
