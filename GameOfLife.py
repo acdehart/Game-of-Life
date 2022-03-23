@@ -29,7 +29,12 @@ from tensorflow.keras.models import Sequential
 
 onWindows = sys.platform.startswith('win')
 if onWindows:
-    import win32gui
+    import win32gui, win32com.client
+
+    shell = win32com.client.Dispatch("WScript.Shell")
+    shell.SendKeys('%')
+    window = win32gui.GetForegroundWindow()
+    win32gui.SetForegroundWindow(window)
 
 ### Initialize stuff ###
 
@@ -990,6 +995,7 @@ class SpriteSheet:
             print(f"Unable to load spritesheet image: {filename}")
             raise SystemExit(e)
         except FileNotFoundError as fnf:
+            print(f"Didn't work. Trying: {'GameOfLife/'+ filename}")
             self.sheet = pygame.image.load('GameOfLife/'+ filename)
 
 
