@@ -1029,7 +1029,7 @@ CastleSS = SpriteSheet(castle_filename)
 mosquito_filename = 'sprites/Mosquito/Mosquito Flying Pose.png'
 MosquitoSS = SpriteSheet(mosquito_filename)
 
-goblin_filename = 'sprites/Goblin/$Goblin.png'
+goblin_filename = 'sprites/Goblin/Goblin.png'
 GoblinSS = SpriteSheet(goblin_filename)
 
 goblin_swing_filename = 'sprites/Goblin/Goblin Stab 2.png'
