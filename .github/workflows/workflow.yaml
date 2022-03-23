@@ -45,22 +45,22 @@ jobs:
           name: Goblins-And-Kittens
           path: dist/Goblins-And-Kittens.exe
 
-      upload-artifacts:
-        name: Upload Artifact
-        needs: build
-        runs-on: windows-latest
+  upload-artifacts:
+    name: Upload Artifact
+    needs: build
+    runs-on: windows-latest
 
-        steps:
-          - name: Display Local Files
-            run: dir
-            shell: cmd
+    steps:
+      - name: Display Local Files
+        run: dir
+        shell: cmd
 
-          - name: Download Artifacts
-            uses: actions/download-artifact@v2
-            id: download
-            with:
-              name: Goblins-And-Kittens
-              path: dist/Goblins-And-Kittens.exe
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        id: download
+        with:
+          name: Goblins-And-Kittens
+          path: dist/Goblins-And-Kittens.exe
 
-          - name: 'Echo download path'
-            run: echo ${{steps.download.outputs.download-path}}
+      - name: 'Echo download path'
+        run: echo ${{steps.download.outputs.download-path}}
