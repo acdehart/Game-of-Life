@@ -36,7 +36,7 @@ jobs:
         shell: cmd
 
       - name: Make app.exe
-        run: pyinstaller --onefile --windowed --add-data="sprites/castle.png;." --add-data="sprites/Mosquito/Mosquito Flying Pose.png;." --add-data="sprites/Goblin/$Goblin.png;." --add-data="sprites/Goblin/Goblin Dying Pose.png;." --add-data="sprites/Evil Head/Evil Head Biting.png;." --add-data="sprites/Evil Skull/Skull Rotten Biting.png;." --add-data="sprites/CART_2.png;." --add-data="sprites/Cats/Black.png;." --add-data="sprites/Cats/Orange.png;." --add-data="sprites/Cats/Yellow.png;." --add-data="sprites/BG112A_W.png;." GameOfLife.py
+        run: pyinstaller --onefile --windowed --add-data="sprites/castle.png;sprites" --add-data="sprites/Mosquito/Mosquito Flying Pose.png;sprites/Mosquito" --add-data="sprites/Goblin/$Goblin.png;sprites/Goblin" --add-data="sprites/Goblin/Goblin Dying Pose.png;sprites/Goblin" --add-data="sprites/Evil Head/Evil Head Biting.png;Evil Head" --add-data="sprites/Evil Skull/Skull Rotten Biting.png;sprites/Evil Skull" --add-data="sprites/CART_2.png;sprites" --add-data="sprites/Cats/Black.png;sprites/Cats" --add-data="sprites/Cats/Orange.png;sprites/Cats" --add-data="sprites/Cats/Yellow.png;sprites/Cats" --add-data="sprites/BG112A_W.png;sprites" GameOfLife.py
 
       - name: Upload .exe
         uses: actions/upload-artifact@v2
