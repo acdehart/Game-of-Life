@@ -70,11 +70,16 @@ class gakGame:
         path += os.sep
 
         pygame.init()  # Init all imported pygame modules
+        # self.c1 = classroom()
         iconPath = path + 'icon.png'
         self.windowTitle = 'Goblins & Kittens'
         pygame.display.set_caption(self.windowTitle)
         if os.path.exists(iconPath):
+            # try:
             icon = pygame.image.load(iconPath)
+            # except FileNotFoundError as fnf:
+            #     self.sheet = pygame.image.load(os.path.basename(iconPath)+'GameOfLife/' + 'icon.png')
+
         pygame.display.set_icon(icon)
         # windowSize = 300, 200
         windowSize = 1080, 640
@@ -95,7 +100,9 @@ class gakGame:
         # Init dialogs:
         self.tkRoot = tkinter.Tk()  # Create Tk main window
         if os.path.exists(iconPath):
-            self.tkRoot.iconphoto(True, tkinter.PhotoImage(file=iconPath))  # Set icon
+            pass
+            # print(f"setting icon from '{iconPath}'")
+            # self.tkRoot.iconphoto(True, tkinter.PhotoImage(file=iconPath))  # Set icon
         dx = (self.tkRoot.winfo_screenwidth() - self.width) // 2
         dy = (self.tkRoot.winfo_screenheight() - self.height) // 2
         self.tkRoot.geometry('{}x{}+{}+{}'.format(self.width, self.height, dx, dy))  # Center Tk window
@@ -133,7 +140,6 @@ class gakGame:
 
         # Matrix that holds the cells borders
         self.poly = numpy.full((self.cellsX, self.cellsY), None)
-
 
         self.updateCellsBorders()
 
@@ -194,6 +200,9 @@ class gakGame:
         # gameState[cellsX - 10 + 2, 21] = 1
 
         self.circ_rad = 10
+        self.c1 = None
+        self.p1 = None
+
 
     def updateWindowHandle(self):
         if onWindows:
@@ -254,18 +263,17 @@ class gakGame:
         if self.p1:
             prev_action = self.p1.action
             if pressed[pygame.K_UP]:
-                print("UP")
                 self.p1.action = 1
-                self.p1.acc += 0.001
+                self.p1.acc += 0.01
             if pressed[pygame.K_DOWN]:
                 self.p1.action = 2
-                self.p1.acc += 0.001
+                self.p1.acc += 0.01
             if pressed[pygame.K_LEFT]:
                 self.p1.action = 3
-                self.p1.acc += 0.001
+                self.p1.acc += 0.01
             if pressed[pygame.K_RIGHT]:
                 self.p1.action = 4
-                self.p1.acc += 0.001
+                self.p1.acc += 0.01
             if self.p1.action != prev_action:
                 self.p1.acc = 0
 
@@ -444,32 +452,60 @@ class gakGame:
 
     # Define landscape
     def setup_game(self):
+        if self.c1:
+            for k in self.c1.cats:
+                k.kill()
+        else:
+            self.c1 = classroom()
+
+        if self.p1:
+            self.p1.kill()
+            self.p1 = None
+
+        self.c1.cats = []
         self.locations = []
         castle = player()
         castle.set_castle()
         self.locations.append(castle)
-        self.c1 = classroom()
-        self.p1 = None
         overlay = False
         self.p1 = player()
+        print(f"Setting up p1: {self.p1}")
         self.p1.set_human()
         # p1.hp = 100000
         self.p1.x = self.cellsX - self.p1.rWall - 1
         self.p1.y = self.cellsY - self.p1.dWall - 1
         self.p1.human = True
         self.p1.color = (0, 0, 128)
-        self.c1.moving_sprites.add(self.p1)
+
         c = player()
         c.set_cat()
+        for cat in self.c1.cats:
+            cat.scooped = False
+            cat.position_cat()
         self.c1.cats.append(c)
+        self.c1.moving_sprites.add(self.p1)
         self.c1.moving_sprites.add(c)
         self.c1.moving_sprites.add(castle)
+        self.c1.init_students()
 
         # Overlay, add
         self.screenOverlay = player()
         self.screenOverlay.set_overlay()
         self.c1.moving_sprites.add(self.screenOverlay)
+        self.reset_clouds()
         # self.updateWindowHandle()
+
+        self.c1.battle = 0
+        self.delay = self.default_delay
+        self.focusWindow()
+        self.p1.hp = 3
+        self.p1.dmg = 1
+        self.p1.armor = 0
+        self.p1.saves = 0
+        self.p1.kills = 0
+        self.p1.living = True
+        self.p1.x = self.cellsX - self.p1.rWall - 1
+        self.p1.y = self.cellsY - self.p1.dWall - 1
 
     ### Welcome screen and game controls ###
 
@@ -580,11 +616,11 @@ class gakGame:
             # pygame.draw.polygon(screen, grey, poly[x, y], 1)
             if len(gg.states) > 0:
                 if gg.states[-1][x, y] == 1:  # Cell just turned off, using lag
-                    cloudEdge = (turf[0], turf[1] - 2, 0)
+                    cloudEdge = (turf[0], turf[1] - 3, 0)
                     pygame.draw.polygon(self.screen, cloudEdge, self.poly[x, y], 0)
                     # pygame.draw.polygon(screen, grey, poly[x, y], 1)
         else:
-            cloud = (turf[0], turf[1] - 3, 0)
+            cloud = (turf[0], turf[1] - 6, 0)
             pygame.draw.polygon(self.screen, cloud, self.poly[x, y], 0)
             # pygame.draw.polygon(screen, grey, poly[x, y], 1)
 
@@ -639,67 +675,66 @@ class gakGame:
 
         if (self.p1 and self.p1.hp <= 0):
             print("You Died!")
-            for s in self.c1.students:
-                s.kill()
-            for c in self.c1.cats:
-                c.kill()
-            self.c1.students = []
-            self.c1.cats = []
-            q1 = player()
-            self.c1.students.append(q1)
-            self.c1.moving_sprites.add(q1)
-            q2 = player()
-            self.c1.students.append(q2)
-            self.c1.moving_sprites.add(q2)
-            c = player()
-            c.set_cat()
-            self.c1.cats.append(c)
-            self.c1.moving_sprites.add(c)
-
             messagebox.showerror('You Died!',
                                  f'{self.c1.battle} Rounds\n{self.p1.saves} Kittens Saved\n{self.p1.kills} Goblin Kills\n{round(self.p1.armor, 2)} Armour\n+{round(self.p1.dmg * 100 - 100)}% Damage')
-            self.c1.battle = 0
-            self.delay = self.default_delay
-            self.focusWindow()
-            self.p1.hp = 3
-            self.p1.dmg = 1
-            self.p1.armor = 0
-            self.p1.kills = 0
-            self.p1.saves = 0
-            self.p1.living = True
-            self.p1.x = self.cellsX - self.p1.rWall - 1
-            self.p1.y = self.cellsY - self.p1.dWall - 1
-            for cat in self.c1.cats:
-                cat.scooped = False
-                cat.position_cat()
+            self.setup_game()
+
+            # for s in self.c1.students:
+            #     s.kill()
+            # for c in self.c1.cats:
+            #     c.kill()
+            # self.c1.students = []
+            # self.c1.cats = []
+            # q1 = player()
+            # self.c1.students.append(q1)
+            # self.c1.moving_sprites.add(q1)
+            # q2 = player()
+            # self.c1.students.append(q2)
+            # self.c1.moving_sprites.add(q2)
+            # c = player()
+            # c.set_cat()
+            # self.c1.cats.append(c)
+            # self.c1.moving_sprites.add(c)
+            #
+            # self.c1.battle = 0
+            # self.delay = self.default_delay
+            # self.focusWindow()
+            # self.p1.hp = 3
+            # self.p1.dmg = 1
+            # self.p1.armor = 0
+            # self.p1.kills = 0
+            # self.p1.saves = 0
+            # self.p1.living = True
+            # self.p1.x = self.cellsX - self.p1.rWall - 1
+            # self.p1.y = self.cellsY - self.p1.dWall - 1
+            # for cat in self.c1.cats:
+            #     cat.scooped = False
+            #     cat.position_cat()
 
         elif self.c1.battle >= self.max_level:
-            # self.setup_game()
-            for s in self.c1.students:
-                s.kill()
-            for k in self.c1.cats:
-                k.kill()
-            self.c1.cats = []
-            self.c1.students = []
-            p = player()
-            self.c1.students.append(p)
-            self.c1.moving_sprites.add(p)
-            q = player()
-            self.c1.students.append(q)
-            self.c1.moving_sprites.add(q)
             messagebox.showerror(f'Level {self.c1.battle} Passed',
                                  f'Goblins took over the land...\n{self.p1.saves} Kittens Saved\n{self.p1.kills} Goblin Kills\n{round(self.p1.armor, 2)} Armour\n+{round(self.p1.dmg * 100 - 100)}% Damage')
-            self.c1.battle = 0
-            self.delay = self.default_delay
-            self.focusWindow()
-            self.p1.hp = 3
-            self.p1.dmg = 1
-            self.p1.armor = 0
-            self.p1.saves = 0
-            self.p1.kills = 0
-            self.p1.living = True
-            self.p1.x = self.cellsX - self.p1.rWall - 1
-            self.p1.y = self.cellsY - self.p1.dWall - 1
+            self.setup_game()
+            #
+            # self.c1.cats = []
+            # self.c1.students = []
+            # p = player()
+            # self.c1.students.append(p)
+            # self.c1.moving_sprites.add(p)
+            # q = player()
+            # self.c1.students.append(q)
+            # self.c1.moving_sprites.add(q)
+            # self.c1.battle = 0
+            # self.delay = self.default_delay
+            # self.focusWindow()
+            # self.p1.hp = 3
+            # self.p1.dmg = 1
+            # self.p1.armor = 0
+            # self.p1.saves = 0
+            # self.p1.kills = 0
+            # self.p1.living = True
+            # self.p1.x = self.cellsX - self.p1.rWall - 1
+            # self.p1.y = self.cellsY - self.p1.dWall - 1
 
         elif (self.p1 and self.p1.ding) or self.c1.count_living() == 0:
             self.c1.battle += 1
@@ -954,6 +989,9 @@ class SpriteSheet:
         except pygame.error as e:
             print(f"Unable to load spritesheet image: {filename}")
             raise SystemExit(e)
+        except FileNotFoundError as fnf:
+            self.sheet = pygame.image.load('GameOfLife/'+ filename)
+
 
     def image_at(self, rectangle, colorkey = None):
         """Load a specific image from a specific rectangle."""
@@ -978,6 +1016,9 @@ class SpriteSheet:
         return self.images_at(tups, colorkey)
 
 gg = gakGame()
+
+castle_filename = 'sprites/castle.png'
+CastleSS = SpriteSheet(castle_filename)
 
 mosquito_filename = 'sprites/Mosquito/Mosquito Flying Pose.png'
 MosquitoSS = SpriteSheet(mosquito_filename)
@@ -1181,6 +1222,7 @@ class classroom:
     def draw_living(self):
 
         if not gg.p1:
+            print("Not GG p1")
             for student in self.students:
                 if student.color == student.b_color and not student.gold:
                     student.drawPlayer()
@@ -1202,9 +1244,8 @@ class classroom:
             for c in self.cats:
                 c.drawPlayer()
 
-            if len(gg.locations) > 0:
-                for loc in gg.locations:
-                    loc.drawPlayer()
+            for loc in gg.locations:
+                loc.drawPlayer()
 
             gg.screenOverlay.drawPlayer()
 
@@ -1507,8 +1548,11 @@ class player(pygame.sprite.Sprite):
         self.color = (0, 0, 0)
         self.x = self.lWall
         self.y = self.uWall
-        self.sprites.append(pygame.image.load(f"sprites/castle.png"))
-        self.sprites.append(pygame.image.load(f"sprites/castle.png"))
+        self.piece_ss = CastleSS
+
+
+
+
 
     def drawPlayer(self):
         ''' Draw player's cell with coordinates (x, y) '''
@@ -1544,7 +1588,7 @@ class player(pygame.sprite.Sprite):
                 self.cat_row = 6
                 # self.image = self.sprites[int((self.current_sprite//(len(self.sprites)-1)) % (len(self.sprites)+3))]
         elif self.castle:
-            self.image = self.sprites[0]
+            self.image = self.piece_ss.image_at((0, 0, 80, 82), colorkey=(0,0,0))
         elif self.piece_ss == CartSS:
             if self.action in [3, 4]:
                 self.image = self.piece_ss.image_at((124, 0, 172-124, 48), colorkey=(147,168,222))
@@ -1590,7 +1634,6 @@ class player(pygame.sprite.Sprite):
             self.image = pygame.transform.scale(self.image, (int(self.size[0]), int(self.size[1])))
         self.rect = self.image.get_rect()
         self.rect.center = [int(self.x*gg.res)+gg.res//2, self.y*gg.res+gg.res//2]
-
 
             # self.students[0].current_sprite += 1
             # self.moving_sprites.image = self.students[0].sprites[self.students[0].current_sprite%len(self.students[0].sprites)]
@@ -1778,9 +1821,6 @@ pygame.mixer.music.set_volume(.3)
 
 # Show initial game state
 # updateScreen()
-
-
-
 
 
 if __name__ == '__main__':
