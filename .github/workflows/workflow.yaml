@@ -3,7 +3,6 @@ name: Goblins-And-Kittens
 on:
   push:
     branches:
-      - main
       - speed_mod
 
 jobs:
