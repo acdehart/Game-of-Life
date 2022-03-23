@@ -42,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Goblins-And-Kittens
-          path: Game-of-Life/dist/Goblins-And-Kittens.exe
+          path: dist/GameOfLife.exe
 
   upload-artifacts:
     name: Upload Artifact
@@ -59,7 +59,7 @@ jobs:
         id: download
         with:
           name: Goblins-And-Kittens
-          path: Game-of-Life/dist/Goblins-And-Kittens.exe
+          path: dist/GameOfLife.exe
 
       - name: 'Echo download path'
         run: echo ${{steps.download.outputs.download-path}}
